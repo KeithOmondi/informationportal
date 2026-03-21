@@ -15,7 +15,8 @@ import userChatReducer from "./slices/userChatSlice";
 import pushReducer from "./slices/pushSlice";
 import ceremonyReducer from "./slices/swearingPreferenceSlice";
 import galleryReducer from "./slices/gallerySlice";
-import programReducer from "./slices/programSlice"
+import programReducer from "./slices/programSlice";
+import presentationsReducer from "./slices/presentationSlice"
 
 export const store = configureStore({
   reducer: {
@@ -31,7 +32,8 @@ export const store = configureStore({
     push: pushReducer,
     ceremony: ceremonyReducer,
     gallery: galleryReducer,
-    program: programReducer
+    program: programReducer,
+    presentations: presentationsReducer
   },
 });
 

@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk, type PayloadAction, type AnyAction } from "@reduxjs/toolkit";
 import { api } from "../../api/axios";
 
-// --- Interfaces (Moved into Slice) ---
+// --- Interfaces ---
 
 export interface Activity {
   _id?: string;
@@ -23,20 +23,24 @@ export interface ProgramData {
   event_title: string;
   schedule: DaySchedule[];
   programFileUrl?: string;
-  isLocked?: boolean;
-  scheduledRelease?: string;
+  isLocked: boolean;
+  scheduledRelease: string;
   updatedAt?: string;
 }
 
 interface ProgramState {
   program: ProgramData | null;
   loading: boolean;
+  isInitialLoading: boolean; 
+  success: boolean;
   error: string | null;
 }
 
 const initialState: ProgramState = {
   program: null,
   loading: false,
+  isInitialLoading: true, 
+  success: false,
   error: null,
 };
 
@@ -71,9 +75,11 @@ export const createProgram = createAsyncThunk("program/create", async (data: Par
 
 export const updateProgram = createAsyncThunk(
   "program/update",
-  async ({ id, data }: { id: string; data: Partial<ProgramData> }, thunkAPI) => {
+  async ({ id, data }: { id: string; data: FormData | Partial<ProgramData> }, thunkAPI) => {
     try {
-      const response = await api.patch(`/program/admin/update/${id}`, data);
+      const response = await api.patch(`/program/admin/update/${id}`, data, {
+        headers: data instanceof FormData ? { "Content-Type": "multipart/form-data" } : {},
+      });
       return response.data;
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || "Update failed");
@@ -98,49 +104,65 @@ const programSlice = createSlice({
   reducers: {
     clearProgramError: (state) => {
       state.error = null;
+      state.success = false;
     },
+    resetProgramStatus: (state) => {
+      state.success = false;
+      state.error = null;
+    }
   },
   extraReducers: (builder) => {
     builder
-      // 1. Cases (Specific Thunk Actions)
+      // Success Handlers
       .addCase(fetchProgram.fulfilled, (state, action: PayloadAction<ProgramData>) => {
         state.loading = false;
+        state.isInitialLoading = false;
         state.program = action.payload;
       })
       .addCase(fetchProgramForAdmin.fulfilled, (state, action: PayloadAction<ProgramData>) => {
         state.loading = false;
+        state.isInitialLoading = false;
         state.program = action.payload;
       })
       .addCase(createProgram.fulfilled, (state, action: PayloadAction<ProgramData>) => {
         state.loading = false;
+        state.success = true;
         state.program = action.payload;
       })
       .addCase(updateProgram.fulfilled, (state, action: PayloadAction<ProgramData>) => {
         state.loading = false;
+        state.success = true;
         state.program = action.payload;
       })
       .addCase(deleteProgram.fulfilled, (state) => {
         state.loading = false;
+        state.success = true;
         state.program = null;
       })
 
-      // 2. Matchers (Global Lifecycle Handlers)
+      // Pending Matcher - Cleaned to prevent flickering
       .addMatcher(
         (action): action is AnyAction => action.type.endsWith("/pending"),
-        (state: ProgramState) => {
+        (state) => {
           state.loading = true;
           state.error = null;
+          state.success = false;
+          // Note: We no longer nullify state.program here. 
+          // This allows the UI to show existing data while the new data loads.
         }
       )
+      // Rejected Matcher
       .addMatcher(
         (action): action is AnyAction => action.type.endsWith("/rejected"),
-        (state: ProgramState, action: AnyAction) => {
+        (state, action: AnyAction) => {
           state.loading = false;
+          state.isInitialLoading = false; 
+          state.success = false;
           state.error = (action.payload as string) || "An unexpected error occurred";
         }
       );
   },
 });
 
-export const { clearProgramError } = programSlice.actions;
+export const { clearProgramError, resetProgramStatus } = programSlice.actions;
 export default programSlice.reducer;

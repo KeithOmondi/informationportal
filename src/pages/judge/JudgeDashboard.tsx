@@ -3,7 +3,6 @@ import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { fetchNotices } from "../../store/slices/noticeSlice";
 import { fetchEvents } from "../../store/slices/eventSlice";
 import { fetchUserGroups, fetchUserMessages } from "../../store/slices/userChatSlice";
-import { type INotice } from "../../store/slices/noticeSlice";
 import { fetchCeremonyInfo } from "../../store/slices/swearingPreferenceSlice";
 
 import {
@@ -17,9 +16,10 @@ import {
   Lock,
   ShieldCheck,
   History,
-  Unlock
+  Unlock,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { type INotice } from "../../store/slices/noticeSlice";
 
 /* --- Institutional Theme Stat Card --- */
 const StatCard = ({
@@ -37,7 +37,7 @@ const StatCard = ({
   urgent?: boolean;
   locked?: boolean;
 }) => (
-  <div className={`bg-white border-l-4 ${locked ? 'border-l-slate-300' : urgent ? 'border-l-[#C5A059]' : 'border-l-[#355E3B]'} border border-slate-200 p-6 rounded-sm relative overflow-hidden group transition-all duration-300 shadow-sm hover:shadow-md`}>
+  <div className={`bg-white border-l-4 ${locked ? 'border-l-slate-300' : urgent ? 'border-l-[#C5A059]' : 'border-l-[#355E3B]'} border border-slate-200 p-6 rounded-sm relative overflow-hidden group transition-all duration-300 shadow-sm hover:shadow-md h-full`}>
     <p className="text-slate-500 text-[10px] uppercase font-bold tracking-[0.15em] mb-4 flex justify-between items-center">
       {title}
       {locked ? <Lock size={10} className="text-slate-400" /> : !locked && title === "Programme" ? <Unlock size={10} className="text-[#C5A059]" /> : null}
@@ -46,12 +46,13 @@ const StatCard = ({
       {loading ? (
         <Loader2 className="animate-spin text-[#355E3B]" size={24} />
       ) : (
-        <h3 className={`text-[#355E3B] text-5xl font-serif transition-colors duration-300 ${locked ? 'text-slate-300' : urgent ? 'text-[#C5A059]' : ''}`}>
+        /* Reduced from 5xl to 3xl to prevent overlap for text values like 'LOCKED' */
+        <h3 className={`text-[#355E3B] text-3xl font-serif font-black transition-colors duration-300 ${locked ? 'text-slate-300' : urgent ? 'text-[#C5A059]' : ''}`}>
           {value}
         </h3>
       )}
     </div>
-    <p className={`text-[11px] mt-2 font-bold uppercase tracking-tight truncate transition-colors ${locked ? 'text-slate-300' : urgent && !loading ? 'text-[#C5A059]' : 'text-slate-400'}`}>
+    <p className={`text-[10px] mt-2 font-bold uppercase tracking-tight truncate transition-colors ${locked ? 'text-slate-300' : urgent && !loading ? 'text-[#C5A059]' : 'text-slate-400'}`}>
       {subtext}
     </p>
   </div>
@@ -85,7 +86,7 @@ const JudgeDashboardPage = () => {
     return () => clearInterval(refreshInterval);
   }, [dispatch, notices.length, events.length, groups.length]);
 
-  /* -------------------- LOGIC MEMOS -------------------- */
+  /* -------------------- LOGIC -------------------- */
   
   const lastLoginFormatted = useMemo(() => {
     if (!user?.lastLogin) return "First session";
@@ -151,7 +152,7 @@ const JudgeDashboardPage = () => {
         {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-6 gap-4">
           <div className="space-y-2">
-            <h1 className="text-3xl md:text-4xl font-serif text-[#355E3B]">
+            <h1 className="text-3xl md:text-4xl font-serif text-[#355E3B] font-black">
               Welcome, <span className="capitalize">Judge {displayName}</span>
             </h1>
             
@@ -169,7 +170,7 @@ const JudgeDashboardPage = () => {
           
           <div className="text-left hidden md:block">
             <p className="text-[10px] font-bold text-slate-400 uppercase">Current Session</p>
-            <p className="text-sm font-serif text-[#355E3B]">
+            <p className="text-sm font-serif font-bold text-[#355E3B]">
               {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
           </div>
@@ -181,7 +182,7 @@ const JudgeDashboardPage = () => {
             <StatCard
               title="Notices"
               value={activeNotices.length}
-              subtext={urgentNoticesCount > 0 ? `${urgentNoticesCount} Urgent Actions Required` : "System Overview"}
+              subtext={urgentNoticesCount > 0 ? `${urgentNoticesCount} Priority Action` : "Registry Overview"}
               loading={noticesLoading && notices.length === 0}
               urgent={urgentNoticesCount > 0}
             />
@@ -191,7 +192,7 @@ const JudgeDashboardPage = () => {
             <StatCard
               title="Messages"
               value={messageStats.unread}
-              subtext={messageStats.unread > 0 ? `${messageStats.unread} Unread Messages` : "No pending alerts"}
+              subtext={messageStats.unread > 0 ? `${messageStats.unread} New Alerts` : "No pending mail"}
               loading={chatLoading && groups.length === 0}
               urgent={messageStats.unread > 0}
             />
@@ -201,12 +202,12 @@ const JudgeDashboardPage = () => {
             <StatCard
               title="Events"
               value={events.length}
-              subtext="Upcoming Calendar"
+              subtext="Judiciary Calendar"
               loading={eventsLoading && events.length === 0}
             />
           </Link>
 
-          {/* UPDATED DYNAMIC PROGRAMME CARD */}
+          {/* DYNAMIC PROGRAMME CARD */}
           <Link 
             to={program?.isLocked ? "#" : "/judge/documents"}
             className={program?.isLocked ? "cursor-not-allowed" : "cursor-pointer"}
@@ -215,11 +216,7 @@ const JudgeDashboardPage = () => {
             <StatCard
               title="Programme"
               value={program?.isLocked ? "LOCKED" : "ACTIVE"}
-              subtext={
-                program?.isLocked 
-                ? "Awaiting Release Time" 
-                : "Ceremony Schedule Available"
-              }
+              subtext={program?.isLocked ? "Awaiting Release" : "Schedule Ready"}
               loading={ceremonyLoading && !program}
               urgent={!program?.isLocked}
               locked={program?.isLocked}
@@ -230,12 +227,11 @@ const JudgeDashboardPage = () => {
         {/* CONTENT GRID */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* MAIN EVENT BOX */}
           <div className="lg:col-span-2 bg-white border border-slate-200 rounded-sm p-6 md:p-8 shadow-sm relative">
              <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 {isOngoing ? <Activity className="text-red-600 animate-pulse" size={22} /> : <Calendar className="text-[#C5A059]" size={22} />}
-                <h2 className="text-[#355E3B] font-serif text-2xl">
+                <h2 className="text-[#355E3B] font-serif text-2xl font-black">
                   {isOngoing ? "Ongoing Assignment" : "Upcoming Event"}
                 </h2>
               </div>
@@ -247,7 +243,7 @@ const JudgeDashboardPage = () => {
                   <p className="text-[#C5A059] text-[11px] uppercase font-black tracking-widest mb-1">
                     {startDate.toLocaleString("en-us", { month: "short" }).toUpperCase()}
                   </p>
-                  <div className="flex items-center justify-center gap-1 text-white font-serif font-bold">
+                  <div className="flex items-center justify-center gap-1 text-white font-serif font-black">
                     <span className="text-5xl">{startDate.getDate()}</span>
                     {isMultiDay && (
                       <>
@@ -256,12 +252,12 @@ const JudgeDashboardPage = () => {
                       </>
                     )}
                   </div>
-                  <p className="text-white/50 text-[10px] font-bold mt-2">{startDate.getFullYear()}</p>
+                  <p className="text-white/50 text-[10px] font-bold mt-2 border-t border-white/10 pt-2">{startDate.getFullYear()}</p>
                 </div>
 
                 <div className="space-y-6 flex-1">
                   <div>
-                    <h3 className="text-[#355E3B] text-2xl font-serif font-bold leading-tight mb-3">
+                    <h3 className="text-[#355E3B] text-2xl font-serif font-black leading-tight mb-3">
                       {displayEvent.title}
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-y border-slate-50 py-4">
@@ -310,11 +306,10 @@ const JudgeDashboardPage = () => {
             )}
           </div>
 
-          {/* NOTICES BOX */}
           <div className="bg-white border border-slate-200 rounded-sm p-6 md:p-8 shadow-sm flex flex-col">
             <div className="flex items-center gap-3 mb-8">
               <FileText className="text-[#C5A059]" size={20} />
-              <h2 className="text-[#355E3B] font-serif text-xl font-bold">Recent Notices</h2>
+              <h2 className="text-[#355E3B] font-serif text-xl font-black">Recent Notices</h2>
             </div>
 
             <div className="space-y-6 flex-1">

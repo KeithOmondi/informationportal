@@ -1,40 +1,42 @@
 import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { 
-  Trash2, 
-  Upload, 
-  UserPlus, 
-  FilePlus, 
-  Loader2,
-  CheckCircle2,
-  ChevronDown,
-  Clock,
-  Calendar,
-  AlertCircle,
-  FileText,
-  Edit3,
-  X
+  Trash2, UserPlus, Loader2, CheckCircle2,
+  AlertCircle, Edit3, X, Lock, Unlock, Calendar, Clock
 } from "lucide-react";
+
+// Slices
 import { 
-  addJudgeBio, 
-  updateJudgeBio, 
-  addPresentation, 
-  updateProgram,
-  deleteCeremonyItem,
-  resetCeremonyStatus
+  addJudgeBio, updateJudgeBio, deleteCeremonyItem, resetCeremonyStatus
 } from "../../store/slices/swearingPreferenceSlice";
+import { 
+  updateProgram, fetchProgramForAdmin, clearProgramError, resetProgramStatus 
+} from "../../store/slices/programSlice";
+import {
+  fetchPresentations, uploadPresentation, deletePresentation, resetPresentationStatus,
+  type Presentation 
+} from "../../store/slices/presentationSlice";
+
 import type { AppDispatch, RootState } from "../../store/store";
 
 const AdminCeremony = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { judges, presentations, program, loading, success, error } = useSelector(
+  
+  // --- SELECTORS ---
+  const { judges, loading: bioLoading, success: bioSuccess, error: bioError } = useSelector(
     (state: RootState) => state.ceremony
+  );
+  const { program, loading: programLoading, success: programSuccess, error: programError } = useSelector(
+    (state: RootState) => state.program
+  );
+  const { items: presentations, loading: presLoading, success: presSuccess, error: presError } = useSelector(
+    (state: RootState) => state.presentations
   );
 
   // --- FORM STATES ---
-  const [uploadType, setUploadType] = useState<"PRESENTATION" | "PROGRAM">("PRESENTATION");
+  const [uploadType, setUploadType] = useState<"PRESENTATION" | "TIMER">("PRESENTATION");
   
-  // Judge/Bio States (Synced with 'description' schema)
+  // Judge/Bio States
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [judgeForm, setJudgeForm] = useState({ name: "", title: "", description: "" });
@@ -44,56 +46,58 @@ const AdminCeremony = () => {
   const [presTitle, setPresTitle] = useState("");
   const [presFile, setPresFile] = useState<File | null>(null);
 
-  // Program States (Simplified)
+  // Program Timer States
   const [releaseDateTime, setReleaseDateTime] = useState("");
-  const [programFile, setProgramFile] = useState<File | null>(null);
 
-  // Success/Error Toast Reset
+  // Initial Data Fetch
   useEffect(() => {
-    if (success || error) {
-      const timer = setTimeout(() => dispatch(resetCeremonyStatus()), 4000);
+    dispatch(fetchProgramForAdmin());
+    dispatch(fetchPresentations());
+  }, [dispatch]);
+
+  // Sync internal state when program data is loaded
+  useEffect(() => {
+    if (program?.scheduledRelease) {
+      // Format: YYYY-MM-DDTHH:mm
+      const date = new Date(program.scheduledRelease);
+      const formatted = date.toISOString().slice(0, 16);
+      setReleaseDateTime(formatted);
+    }
+  }, [program]);
+
+  // Status Cleanup
+  useEffect(() => {
+    if (bioSuccess || presSuccess || programSuccess || bioError || programError || presError) {
+      const timer = setTimeout(() => {
+        dispatch(resetCeremonyStatus());
+        dispatch(clearProgramError());
+        dispatch(resetPresentationStatus());
+        dispatch(resetProgramStatus());
+      }, 4000);
       return () => clearTimeout(timer);
     }
-  }, [success, error, dispatch]);
+  }, [bioSuccess, presSuccess, programSuccess, bioError, programError, presError, dispatch]);
 
   // --- HANDLERS ---
-
-  const handleEditInit = (judge: any) => {
-    setIsEditing(true);
-    setEditingId(judge._id);
-    setJudgeForm({ 
-      name: judge.name, 
-      title: judge.title, 
-      description: judge.description || judge.bio // Handle fallback 
-    });
-    setJudgeFile(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const cancelEdit = () => {
-    setIsEditing(false);
-    setEditingId(null);
-    setJudgeForm({ name: "", title: "", description: "" });
-    setJudgeFile(null);
-  };
 
   const handleJudgeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData();
     formData.append("name", judgeForm.name);
     formData.append("title", judgeForm.title);
-    formData.append("description", judgeForm.description); // Backend expects description
+    formData.append("description", judgeForm.description);
     if (judgeFile) formData.append("image", judgeFile);
 
     if (isEditing && editingId) {
       dispatch(updateJudgeBio({ judgeId: editingId, formData }));
-      cancelEdit();
+      setIsEditing(false);
+      setEditingId(null);
     } else {
       if (!judgeFile) return alert("Please select an image");
       dispatch(addJudgeBio(formData));
-      setJudgeForm({ name: "", title: "", description: "" });
-      setJudgeFile(null);
     }
+    setJudgeForm({ name: "", title: "", description: "" });
+    setJudgeFile(null);
   };
 
   const handlePresentationSubmit = (e: React.FormEvent) => {
@@ -102,44 +106,54 @@ const AdminCeremony = () => {
     const formData = new FormData();
     formData.append("title", presTitle);
     formData.append("file", presFile); 
-    dispatch(addPresentation(formData));
+    dispatch(uploadPresentation(formData));
     setPresTitle("");
     setPresFile(null);
   };
 
-  const handleProgramSubmit = (e: React.FormEvent) => {
+  const handleTimerUpdate = (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData();
-    // Use 'scheduledFor' to match your controller's req.body parsing
-    if (releaseDateTime) formData.append("scheduledFor", releaseDateTime);
-    if (programFile) formData.append("file", programFile);
+    if (!program?._id) return;
     
-    dispatch(updateProgram(formData));
-    setReleaseDateTime("");
-    setProgramFile(null);
+    // Send as JSON since we aren't uploading files for the program anymore
+    dispatch(updateProgram({ 
+      id: program._id, 
+      data: { scheduledRelease: releaseDateTime } 
+    }));
   };
+
+  const toggleMasterLock = () => {
+    if (!program?._id) return;
+    dispatch(updateProgram({ 
+      id: program._id, 
+      data: { isLocked: !program.isLocked } 
+    }));
+  };
+
+  const formatFileSize = (bytes: number) => (bytes / (1024 * 1024)).toFixed(2) + " MB";
+  const isGlobalLoading = bioLoading || programLoading || presLoading;
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-12 pb-20">
       
-      {/* NOTIFICATION HEADER */}
+      {/* HEADER */}
       <div className="flex justify-between items-end border-b border-slate-200 pb-6">
         <div>
           <h1 className="text-3xl font-serif font-bold text-[#1a1a1a]">ADMINISTRATION</h1>
           <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-1">
-            Ceremony Materials & Schedule
+            Judiciary Materials & Access Control
           </p>
         </div>
         
         <div className="flex flex-col items-end gap-2">
-          {success && (
-            <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full text-[10px] font-black uppercase animate-in fade-in slide-in-from-top-2">
-              <CheckCircle2 size={14} /> Update Successful
+          {(bioSuccess || presSuccess || programSuccess) && (
+            <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full text-[10px] font-black uppercase">
+              <CheckCircle2 size={14} /> Action Successful
             </div>
           )}
-          {error && (
+          {(bioError || programError || presError) && (
             <div className="flex items-center gap-2 text-red-600 bg-red-50 px-4 py-2 rounded-full text-[10px] font-black uppercase">
-              <AlertCircle size={14} /> {error}
+              <AlertCircle size={14} /> System Error
             </div>
           )}
         </div>
@@ -153,195 +167,170 @@ const AdminCeremony = () => {
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3 text-[#355E3B]">
                 <UserPlus size={20} />
-                <h2 className="font-bold uppercase tracking-tighter text-lg">
-                  {isEditing ? "Update Biography" : "Add Biography"}
-                </h2>
+                <h2 className="font-bold uppercase tracking-tighter text-lg">{isEditing ? "Update Bio" : "Add Bio"}</h2>
               </div>
               {isEditing && (
-                <button onClick={cancelEdit} className="text-slate-400 hover:text-red-500 flex items-center gap-1 text-[10px] font-bold uppercase">
-                  <X size={14} /> Cancel Edit
+                <button 
+                  onClick={() => { setIsEditing(false); setEditingId(null); setJudgeForm({name: "", title: "", description: ""}); }} 
+                  className="text-red-500 text-[10px] font-bold uppercase"
+                >
+                  <X size={14} />
                 </button>
               )}
             </div>
 
             <form onSubmit={handleJudgeSubmit} className="space-y-4">
               <input 
-                type="text" placeholder="Full Name" required 
-                className="w-full p-4 bg-slate-50 rounded-2xl border-none text-sm"
-                value={judgeForm.name}
-                onChange={(e) => setJudgeForm({...judgeForm, name: e.target.value})}
+                className="w-full p-4 bg-slate-50 rounded-2xl text-sm outline-none" 
+                placeholder="Full Name" value={judgeForm.name} 
+                onChange={(e) => setJudgeForm({...judgeForm, name: e.target.value})} 
               />
               <input 
-                type="text" placeholder="Title (e.g. High Court Judge)" required 
-                className="w-full p-4 bg-slate-50 rounded-2xl border-none text-sm" 
-                value={judgeForm.title}
+                className="w-full p-4 bg-slate-50 rounded-2xl text-sm outline-none" 
+                placeholder="Title" value={judgeForm.title} 
                 onChange={(e) => setJudgeForm({...judgeForm, title: e.target.value})} 
               />
               <textarea 
-                placeholder="Professional Description" required
-                className="w-full p-4 bg-slate-50 rounded-2xl border-none text-sm h-40" 
-                value={judgeForm.description}
+                className="w-full p-4 bg-slate-50 rounded-2xl text-sm h-32 outline-none" 
+                placeholder="Description" value={judgeForm.description} 
                 onChange={(e) => setJudgeForm({...judgeForm, description: e.target.value})} 
               />
-              <div className="flex items-center gap-4 p-4 border-2 border-dashed border-slate-200 rounded-2xl hover:border-[#355E3B] transition-colors group">
-                <Upload className="text-slate-400 group-hover:text-[#355E3B]" size={20} />
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">
-                    {isEditing ? "Replace Image (Optional)" : "Profile Image"}
-                  </span>
-                  <input 
-                    type="file" accept="image/*" 
-                    onChange={(e) => setJudgeFile(e.target.files?.[0] || null)} 
-                    className="text-xs mt-1" 
-                  />
-                </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase ml-2">Profile Image</label>
+                <input type="file" className="text-xs" onChange={(e) => setJudgeFile(e.target.files?.[0] || null)} />
               </div>
-              <button disabled={loading} className="w-full py-4 bg-[#355E3B] text-white rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-[#2a4a2f] transition-all flex justify-center items-center gap-2">
-                {loading ? <Loader2 className="animate-spin" size={16} /> : isEditing ? "Update Profile" : "Save Profile"}
+              <button disabled={isGlobalLoading} className="w-full py-4 bg-[#355E3B] text-white rounded-2xl font-bold uppercase text-[10px]">
+                {bioLoading ? <Loader2 className="animate-spin mx-auto" size={16} /> : isEditing ? "Update Profile" : "Save Profile"}
               </button>
             </form>
           </div>
 
-          <div className="bg-[#1a1a1a] p-8 rounded-[2.5rem] shadow-xl">
-             <h3 className="text-xs font-black uppercase tracking-[0.3em] mb-6 text-slate-500">Stored Biographies</h3>
-             <div className="space-y-3">
-                {judges.map(judge => (
-                  <div key={judge._id} className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-slate-800 overflow-hidden">
-                        <img src={judge.imageUrl} alt="" className="w-full h-full object-cover" />
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-bold text-white">{judge.name}</p>
-                        <p className="text-[9px] uppercase text-slate-500">{judge.title}</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => handleEditInit(judge)} className="p-2 text-slate-400 hover:text-[#C5A059] transition-colors">
-                        <Edit3 size={16} />
-                      </button>
-                      <button onClick={() => dispatch(deleteCeremonyItem({ type: "judges", id: judge._id }))} className="p-2 text-slate-400 hover:text-red-400 transition-colors">
-                        <Trash2 size={16} />
-                      </button>
+          <div className="bg-[#1a1a1a] p-6 rounded-[2.5rem]">
+            <h3 className="text-white/40 text-[10px] font-black uppercase mb-4">Saved Profiles</h3>
+            <div className="space-y-3">
+              {judges.map(judge => (
+                <div key={judge._id} className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10">
+                  <div className="flex items-center gap-3">
+                    <img src={judge.imageUrl} className="w-10 h-10 rounded-lg object-cover" alt="" />
+                    <div>
+                      <p className="text-xs text-white font-bold">{judge.name}</p>
+                      <p className="text-[9px] text-slate-500 uppercase">{judge.title}</p>
                     </div>
                   </div>
-                ))}
-             </div>
+                  <div className="flex gap-2">
+                     <button 
+                      onClick={() => {
+                        setIsEditing(true);
+                        setEditingId(judge._id);
+                        setJudgeForm({ name: judge.name, title: judge.title, description: judge.description });
+                      }}
+                      className="text-slate-500 hover:text-white"
+                    >
+                      <Edit3 size={16} />
+                    </button>
+                    <button onClick={() => dispatch(deleteCeremonyItem({ type: "judges", id: judge._id }))} className="text-slate-500 hover:text-red-400">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
-        {/* RIGHT: DYNAMIC ASSETS & PROGRAM */}
+        {/* RIGHT: PRESENTATIONS & ACCESS TIMER */}
         <section className="space-y-8">
           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-            <div className="relative mb-8">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Upload Category</label>
-              <div className="relative">
-                <select 
-                  value={uploadType}
-                  onChange={(e) => setUploadType(e.target.value as any)}
-                  className="w-full p-4 bg-slate-900 text-white rounded-2xl appearance-none font-bold text-xs tracking-widest cursor-pointer outline-none"
-                >
-                  <option value="PRESENTATION">PRESENTATION MATERIALS</option>
-                  <option value="PROGRAM">CEREMONY PROGRAM</option>
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-[#C5A059]" size={18} />
-              </div>
+            <div className="flex bg-slate-100 p-1 rounded-2xl mb-8">
+               <button 
+                onClick={() => setUploadType("PRESENTATION")}
+                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${uploadType === "PRESENTATION" ? "bg-white shadow-sm text-slate-900" : "text-slate-500"}`}
+               >
+                Materials
+               </button>
+               <button 
+                onClick={() => setUploadType("TIMER")}
+                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${uploadType === "TIMER" ? "bg-white shadow-sm text-slate-900" : "text-slate-500"}`}
+               >
+                Access Timer
+               </button>
             </div>
 
             {uploadType === "PRESENTATION" ? (
-              <form onSubmit={handlePresentationSubmit} className="space-y-4 animate-in fade-in duration-500">
-                <div className="flex items-center gap-3 mb-4 text-[#C5A059]">
-                  <FilePlus size={20} />
-                  <h2 className="font-bold uppercase tracking-tighter text-sm">Upload Material</h2>
-                </div>
-                <input type="text" placeholder="Document/Video Title" required className="w-full p-4 bg-slate-50 rounded-2xl text-sm" value={presTitle} onChange={(e) => setPresTitle(e.target.value)} />
-                <div className="flex items-center gap-4 p-4 border-2 border-dashed border-slate-200 rounded-2xl group hover:border-[#C5A059] transition-colors">
-                  <Upload className="text-slate-400 group-hover:text-[#C5A059]" size={20} />
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">File (PDF/Video)</span>
-                    <input type="file" accept=".pdf,.doc,.docx,video/*" onChange={(e) => setPresFile(e.target.files?.[0] || null)} className="text-xs mt-1" />
-                  </div>
-                </div>
-                <button disabled={loading} className="w-full py-4 bg-[#C5A059] text-white rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-[#a8894c] transition-all flex justify-center items-center gap-2">
-                  {loading ? <Loader2 className="animate-spin" size={16} /> : "Upload Material"}
+              <form onSubmit={handlePresentationSubmit} className="space-y-4">
+                <input 
+                  className="w-full p-4 bg-slate-50 rounded-2xl text-sm outline-none" 
+                  placeholder="Material Title" value={presTitle} onChange={(e) => setPresTitle(e.target.value)} 
+                />
+                <input type="file" className="text-xs" onChange={(e) => setPresFile(e.target.files?.[0] || null)} />
+                <button disabled={isGlobalLoading} className="w-full py-4 bg-[#C5A059] text-white rounded-2xl font-bold uppercase text-[10px]">
+                  {presLoading ? <Loader2 className="animate-spin mx-auto" size={16} /> : "Upload Asset"}
                 </button>
               </form>
             ) : (
-              /* SIMPLIFIED PROGRAM FORM: Only Release Time & File Upload */
-              <form onSubmit={handleProgramSubmit} className="space-y-6 animate-in fade-in duration-500">
-                <div className="flex items-center gap-3 mb-2 text-[#C5A059]">
-                  <Calendar size={20} />
-                  <h2 className="font-bold uppercase tracking-tighter text-sm">Schedule & File</h2>
-                </div>
-                
-                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Clock size={14} className="text-[#C5A059]" />
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Release Date & Time</label>
+              <form onSubmit={handleTimerUpdate} className="space-y-6">
+                <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Master Security Lock</span>
+                    <button 
+                      type="button"
+                      onClick={toggleMasterLock}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-[9px] font-bold uppercase transition-all ${program?.isLocked ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}
+                    >
+                      {program?.isLocked ? <><Lock size={12}/> Locked</> : <><Unlock size={12}/> Open</>}
+                    </button>
                   </div>
-                  <input 
-                    type="datetime-local" 
-                    className="w-full p-3 bg-white rounded-xl border border-slate-200 text-xs font-bold" 
-                    value={releaseDateTime} 
-                    onChange={(e) => setReleaseDateTime(e.target.value)} 
-                  />
+                  <p className="text-[11px] text-slate-500 leading-relaxed italic">
+                    When locked, the program content is hidden regardless of the timer below.
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-4 p-4 border-2 border-dashed border-slate-200 rounded-2xl group hover:border-slate-900 transition-colors">
-                  <FileText className="text-slate-400 group-hover:text-slate-900" size={20} />
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Upload PDF Program</span>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Scheduled Reveal Date & Time</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                     <input 
-                      type="file" 
-                      accept=".pdf,.doc,.docx" 
-                      onChange={(e) => setProgramFile(e.target.files?.[0] || null)} 
-                      className="text-xs mt-1" 
+                      type="datetime-local" 
+                      className="w-full p-4 pl-12 bg-slate-50 rounded-2xl text-sm font-bold outline-none border border-transparent focus:border-[#C5A059] transition-all"
+                      value={releaseDateTime} 
+                      onChange={(e) => setReleaseDateTime(e.target.value)} 
                     />
                   </div>
                 </div>
 
-                <button disabled={loading} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-black transition-all flex justify-center items-center gap-2">
-                  {loading ? <Loader2 className="animate-spin" size={16} /> : "Update Schedule"}
+                <button disabled={isGlobalLoading} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold uppercase text-[10px] flex items-center justify-center gap-2">
+                  {programLoading ? <Loader2 className="animate-spin" size={16} /> : <><Clock size={16}/> Sync Countdown</>}
                 </button>
               </form>
             )}
           </div>
 
-          {/* ASSET STATUS LIST */}
-          <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] shadow-xl">
-            <h3 className="text-xs font-black uppercase tracking-[0.3em] mb-6 text-slate-400">Current Assets</h3>
-            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+          {/* ASSET LISTS */}
+          <div className="bg-slate-900 p-8 rounded-[2.5rem]">
+            <h3 className="text-slate-500 text-[10px] font-black uppercase mb-4 tracking-widest">Live Status</h3>
+            <div className="space-y-3">
               {uploadType === "PRESENTATION" ? (
-                presentations.map(p => (
+                presentations.map((p: Presentation) => (
                   <div key={p._id} className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10">
                     <div className="flex flex-col">
-                      <p className="text-[11px] font-bold truncate pr-4">{p.title}</p>
-                      <span className="text-[8px] uppercase text-slate-500">{p.fileType}</span>
+                      <p className="text-xs text-white font-bold">{p.title}</p>
+                      <p className="text-[9px] text-slate-500 uppercase">{p.mimeType} • {formatFileSize(p.fileSize)}</p>
                     </div>
-                    <button onClick={() => dispatch(deleteCeremonyItem({ type: "presentations", id: p._id }))} className="p-2 text-slate-500 hover:text-red-400 transition-colors">
-                      <Trash2 size={16} />
-                    </button>
+                    <button onClick={() => dispatch(deletePresentation(p._id))} className="text-slate-500 hover:text-red-400"><Trash2 size={16} /></button>
                   </div>
                 ))
               ) : (
-                <div className="space-y-4">
-                  <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
-                    <p className="text-[10px] font-black uppercase text-[#C5A059] tracking-widest mb-1">Status</p>
-                    <p className="text-[12px] font-serif">
-                      {program?.scheduledRelease 
-                        ? `Public after: ${new Date(program.scheduledRelease).toLocaleString()}` 
-                        : "No release time set"}
-                    </p>
-                  </div>
-                  {program?.programFileUrl && (
-                    <div className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10">
-                      <div className="flex items-center gap-3">
-                        <FileText size={16} className="text-emerald-400" />
-                        <span className="text-[10px] font-bold">PDF Program Uploaded</span>
-                      </div>
-                      <a href={program.programFileUrl} target="_blank" rel="noreferrer" className="text-[10px] underline text-slate-400 hover:text-white">View File</a>
+                <div className="p-6 bg-white/5 rounded-2xl border border-white/10">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-[#C5A059] font-bold uppercase tracking-tighter">Current Target</p>
+                      <p className="text-sm text-white font-serif mt-1">
+                        {program?.scheduledRelease 
+                          ? new Date(program.scheduledRelease).toLocaleString('en-KE', { dateStyle: 'full', timeStyle: 'short' })
+                          : "No Target Set"}
+                      </p>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>

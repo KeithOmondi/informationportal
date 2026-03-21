@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { Link } from "react-router-dom";
 
@@ -13,6 +13,9 @@ import {
   AlertCircle,
   MapPin,
   MessageSquare,
+  Lock,
+  Unlock,
+  Clock,
 } from "lucide-react";
 
 // Thunks
@@ -20,6 +23,7 @@ import { fetchUsers } from "../../store/slices/adminUserSlice";
 import { fetchEvents } from "../../store/slices/eventSlice";
 import { fetchStats, fetchAllMessages } from "../../store/slices/adminMessageSlice";
 import { fetchNotices } from "../../store/slices/noticeSlice";
+import { fetchProgram } from "../../store/slices/programSlice";
 
 // Interfaces
 import { type IUser } from "../../store/slices/adminUserSlice";
@@ -33,7 +37,11 @@ const AdminDashboard = () => {
   const { users = [] } = useAppSelector((state) => state.users);
   const { events = [], loading: eventsLoading } = useAppSelector((state) => state.events);
   const { notices = [], loading: noticesLoading } = useAppSelector((state) => state.notices);
-  const { stats: chatStats  } = useAppSelector((state) => state.adminChat);
+  const { stats: chatStats } = useAppSelector((state) => state.adminChat); 
+  const { program, loading: programLoading } = useAppSelector((state) => state.program);
+
+  // Timer State for Program Countdown
+  const [programCountdown, setProgramCountdown] = useState("");
 
   // 2. Fetch all required data on mount
   useEffect(() => {
@@ -41,7 +49,8 @@ const AdminDashboard = () => {
     dispatch(fetchEvents({ filter: "UPCOMING" }));
     dispatch(fetchStats());
     dispatch(fetchNotices());
-    dispatch(fetchAllMessages({ limit: 5 })); // Get a few recent logs for the dashboard
+    dispatch(fetchProgram());
+    dispatch(fetchAllMessages({ limit: 5 }));
   }, [dispatch]);
 
   // 3. Logic & Calculations
@@ -50,6 +59,32 @@ const AdminDashboard = () => {
     e?.status === "SCHEDULED" || e?.status === "ONGOING"
   ).length || 0;
   const activeNoticesCount = notices?.filter(n => n.isActive).length || 0;
+
+  // 4. Program Countdown Logic
+  useEffect(() => {
+    if (!program?.isLocked || !program?.scheduledRelease) {
+      setProgramCountdown("");
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const target = new Date(program.scheduledRelease).getTime();
+      const diff = target - now;
+
+      if (diff <= 0) {
+        dispatch(fetchProgram()); 
+        clearInterval(interval);
+      } else {
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff / 60000) % 60);
+        const s = Math.floor((diff / 1000) % 60);
+        setProgramCountdown(`${h}h ${m}m ${s}s`);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [program, dispatch]);
 
   const stats = [
     {
@@ -82,6 +117,10 @@ const AdminDashboard = () => {
     },
   ];
 
+  const programIsLocked = !!program?.isLocked;
+  const programStatusLabel = programIsLocked ? "Locked" : "Active";
+  const ProgramIcon = programIsLocked ? Lock : Unlock;
+
   const formatDateTime = (isoString: string) => {
     if (!isoString) return { date: "N/A", time: "" };
     const dateObj = new Date(isoString);
@@ -97,7 +136,6 @@ const AdminDashboard = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
           <h1 className="text-[#355E3B] font-serif text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-slate-500 text-sm font-medium mt-1"></p>
         </div>
         <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
           <TrendingUp size={14} /> System Analytics
@@ -124,6 +162,44 @@ const AdminDashboard = () => {
         ))}
       </div>
 
+      {/* PROGRAM STATUS CARD - Handling programLoading to fix ts(6133) */}
+      <div className="bg-[#355E3B] p-6 rounded-2xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative group min-h-[120px]">
+        {programLoading ? (
+          <div className="relative z-10 w-full animate-pulse">
+            <div className="h-3 w-32 bg-white/20 rounded mb-3" />
+            <div className="h-8 w-48 bg-white/20 rounded" />
+          </div>
+        ) : (
+          <>
+            <div className="relative z-10">
+              <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em]">Program Status</p>
+              <div className="flex items-baseline gap-3 mt-1">
+                <h3 className="text-3xl font-serif font-black text-white">{programStatusLabel}</h3>
+                {programIsLocked && (
+                  <span className="text-[#C5A059] font-mono text-lg font-bold animate-pulse">
+                    {programCountdown}
+                  </span>
+                )}
+              </div>
+              <p className="text-white/40 text-[9px] font-bold uppercase tracking-widest mt-2 flex items-center gap-2">
+                <Clock size={12} /> {programIsLocked ? "Under Review" : "Currently visible to all judges"}
+              </p>
+            </div>
+            
+            <div className="relative z-10 flex gap-3">
+                <Link 
+                  to="/admin/documents" 
+                  className="px-6 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full text-[10px] font-black uppercase tracking-widest text-white transition-all backdrop-blur-sm"
+                >
+                  Manage Program
+                </Link>
+            </div>
+          </>
+        )}
+        <ProgramIcon className="absolute -right-4 -bottom-4 text-white/5 w-32 h-32 transform -rotate-12 group-hover:rotate-0 transition-transform duration-700" />
+      </div>
+
+      {/* Tables Section */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         {/* UPCOMING EVENTS TABLE */}
         <div className="xl:col-span-2 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -225,8 +301,6 @@ const AdminDashboard = () => {
           </div>
         </div>
       </div>
-
-      
     </div>
   );
 };
