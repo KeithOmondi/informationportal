@@ -1,135 +1,68 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import HTMLFlipBook from 'react-pageflip';
 import {
   User,
   Presentation as PresentationIcon,
-  Calendar,
   ChevronRight,
   X,
   Download,
-  PlayCircle,
-  Clock,
-  FileText,
+  BookOpen,
   Lock,
 } from "lucide-react";
 import type { AppDispatch, RootState } from "../../store/store";
-import {
-  fetchCeremonyInfo,
-  type Judge,
-} from "../../store/slices/swearingPreferenceSlice";
+import { fetchProgram } from "../../store/slices/programSlice";
+import { fetchCeremonyInfo, type Judge } from "../../store/slices/swearingPreferenceSlice";
+import Cover from "../../assets/Cover.png";
 
 /* =====================================================
-    COUNTDOWN TIMER COMPONENT
+    FLIPBOOK PAGE COMPONENT
 ===================================================== */
-const CountdownTimer: React.FC<{ targetDate: string }> = ({ targetDate }) => {
-  const [timeLeft, setTimeLeft] = useState<{
-    h: number;
-    m: number;
-    s: number;
-  } | null>(null);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date().getTime();
-      const distance = new Date(targetDate).getTime() - now;
-      if (distance < 0) {
-        clearInterval(timer);
-        setTimeLeft(null);
-      } else {
-        setTimeLeft({
-          h: Math.floor(distance / (1000 * 60 * 60)),
-          m: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
-          s: Math.floor((distance % (1000 * 60)) / 1000),
-        });
-      }
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [targetDate]);
-
-  if (!timeLeft)
-    return (
-      <p className="text-[#C5A059] text-[10px] font-black uppercase mt-4 animate-pulse">
-        Refreshing Official Schedule...
-      </p>
-    );
-
+const Page = React.forwardRef<HTMLDivElement, { number: number; children: React.ReactNode; isCover?: boolean }>((props, ref) => {
   return (
-    <div className="flex gap-3 mt-6 justify-center">
-      {[
-        { label: "HRS", val: timeLeft.h },
-        { label: "MIN", val: timeLeft.m },
-        { label: "SEC", val: timeLeft.s },
-      ].map((unit) => (
-        <div key={unit.label} className="text-center">
-          <div className="bg-white/10 backdrop-blur-md rounded-lg p-2 min-w-[50px] border border-white/10">
-            <span className="text-xl font-bold font-mono text-white">
-              {String(unit.val).padStart(2, "0")}
-            </span>
+    <div 
+      className={`w-full h-full flex flex-col relative overflow-hidden ${props.isCover ? 'bg-white shadow-xl' : 'bg-[#fdfbf7]'}`} 
+      ref={ref}
+      style={!props.isCover ? {
+        background: "linear-gradient(to right, #fdfbf7 0%, #ffffff 5%, #ffffff 95%, #fdfbf7 100%)",
+        boxShadow: "inset 0 0 40px rgba(0,0,0,0.05)"
+      } : {}}
+    >
+      <div className={`flex-1 relative z-0 ${!props.isCover ? 'm-2 sm:m-4 border border-[#355E3B]/10 p-3 sm:p-6 rounded-sm' : ''}`}>
+        {props.children}
+        {!props.isCover && props.number > 1 && (
+          <div className="absolute bottom-2 right-4 text-[7px] font-black text-slate-300 tracking-widest uppercase">
+            P. {props.number}
           </div>
-          <p className="text-[7px] uppercase font-black mt-1 text-[#C5A059] tracking-tighter">
-            {unit.label}
-          </p>
-        </div>
-      ))}
+        )}
+      </div>
     </div>
   );
-};
+});
+Page.displayName = "Page";
 
 /* =====================================================
-    BIO MODAL COMPONENT
+    BIO MODAL
 ===================================================== */
-const BioModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  data: Judge | null;
-}> = ({ isOpen, onClose, data }) => {
+const BioModal: React.FC<{ isOpen: boolean; onClose: () => void; data: Judge | null }> = ({ isOpen, onClose, data }) => {
   if (!isOpen || !data) return null;
-
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="relative bg-white w-full max-w-5xl rounded-[2rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col md:flex-row">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-50 p-2 bg-white/80 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-full transition-all border border-slate-100"
-        >
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/95 backdrop-blur-md animate-in fade-in duration-500">
+      <div className="relative bg-white w-full max-w-5xl rounded-t-[2.5rem] sm:rounded-[2rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-500 max-h-[95vh] flex flex-col md:flex-row">
+        <button onClick={onClose} className="absolute top-4 right-4 z-[60] p-2.5 bg-black/40 hover:bg-[#355E3B] text-white rounded-full transition-all border border-white/20">
           <X size={20} />
         </button>
-
-        <div className="relative w-full md:w-[35%] bg-slate-100 shrink-0 h-64 md:h-auto">
-          <img
-            src={data.imageUrl}
-            className="absolute inset-0 w-full h-full object-cover object-top"
-            alt={data.name}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#355E3B] via-transparent to-transparent" />
-          <div className="absolute bottom-0 left-0 w-full p-6 text-white">
-            <h3 className="font-serif font-bold text-lg leading-tight">
-              {data.name}
-            </h3>
-            <p className="text-[#C5A059] font-black text-[9px] uppercase tracking-widest mt-1">
-              {data.title}
-            </p>
+        <div className="relative w-full md:w-[45%] bg-slate-200 shrink-0 h-[45vh] md:h-auto overflow-hidden">
+          <img src={data.imageUrl} className="absolute inset-0 w-full h-full object-cover object-top" alt={data.name} />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#1a2e1d] via-[#1a2e1d]/20 to-transparent opacity-90" />
+          <div className="absolute bottom-0 left-0 w-full p-8">
+            <h3 className="font-serif font-bold text-2xl text-white">{data.name}</h3>
+            <p className="text-[#C5A059] font-black text-[10px] uppercase tracking-widest">{data.title}</p>
           </div>
         </div>
-
-        <div className="flex-1 p-8 md:p-12 overflow-y-auto bg-[#FDFDFD] custom-scrollbar">
-          <div className="max-w-xl mx-auto space-y-6">
-            <div className="flex items-center gap-4 opacity-40">
-              <div className="h-px flex-1 bg-slate-300" />
-              <p className="text-[9px] font-black uppercase tracking-[.3em] text-[#355E3B]">
-                Profile
-              </p>
-              <div className="h-px flex-1 bg-slate-300" />
-            </div>
-            <h2 className="text-[#1a1a1a] text-4xl font-serif italic leading-tight">
-              Professional Biography
-            </h2>
-
-            {/* UPDATED: Changed .bio to .description to match Schema */}
-            <div className="text-slate-600 leading-relaxed text-base font-serif whitespace-pre-line border-l-2 border-[#C5A059]/30 pl-6 italic">
-              {data.description ||
-                "Detailed judicial profile is currently being updated."}
-            </div>
+        <div className="flex-1 p-8 overflow-y-auto bg-white">
+          <div className="text-slate-600 leading-relaxed font-serif italic whitespace-pre-line">
+            {data.description || "Official records are currently being updated by the Secretariat."}
           </div>
         </div>
       </div>
@@ -137,231 +70,202 @@ const BioModal: React.FC<{
   );
 };
 
-/* =====================================================
-    MAIN PAGE COMPONENT
-===================================================== */
 const JudgesReligion = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { judges, presentations, program, loading } = useSelector(
-    (state: RootState) => state.ceremony,
-  );
-
-  const [activeTab, setActiveTab] = useState("BIO");
+  const { program } = useSelector((state: RootState) => state.program);
+  const { judges, presentations } = useSelector((state: RootState) => state.ceremony);
+  const [activeTab, setActiveTab] = useState("PROGRAM");
   const [selectedJudge, setSelectedJudge] = useState<Judge | null>(null);
+  
+  // COUNTDOWN LOGIC
+  const [timeLeft, setTimeLeft] = useState<{h: number, m: number, s: number} | null>(null);
+  const [isLocked, setIsLocked] = useState(true);
 
   useEffect(() => {
     dispatch(fetchCeremonyInfo());
+    dispatch(fetchProgram());
+
+    const timer = setInterval(() => {
+      const now = new Date();
+      const target = new Date();
+      target.setHours(23, 59, 59, 999); // Set to 11:59:59 PM today
+
+      const difference = target.getTime() - now.getTime();
+
+      if (difference <= 0) {
+        setIsLocked(false);
+        clearInterval(timer);
+      } else {
+        const h = Math.floor((difference / (1000 * 60 * 60)) % 24);
+        const m = Math.floor((difference / 1000 / 60) % 60);
+        const s = Math.floor((difference / 1000) % 60);
+        setTimeLeft({ h, m, s });
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
   }, [dispatch]);
 
   const tabs = [
-    { id: "PROGRAM", label: "Program", icon: <Calendar size={14} /> },
+    { id: "PROGRAM", label: "Program", icon: <BookOpen size={14} /> },
     { id: "BIO", label: "Bio", icon: <User size={14} /> },
-    {
-      id: "PRESENTATION",
-      label: "Presentations",
-      icon: <PresentationIcon size={14} />,
-    },
+    { id: "PRESENTATION", label: "Presentations", icon: <PresentationIcon size={14} /> },
   ];
 
-  if (loading && judges.length === 0) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center text-[10px] font-black uppercase tracking-[0.3em] text-[#355E3B] animate-pulse">
-        Retrieving Official Records...
-      </div>
+  const programPages = useMemo(() => {
+    if (!program?.schedule || program.schedule.length === 0) return [];
+    const pages = [];
+
+    // 1. Cover Page
+    pages.push(
+      <Page key="cover" number={1} isCover={true}>
+        <div className="absolute inset-0 w-full h-full bg-white">
+          <img src={Cover} alt="Cover" className="w-full h-full object-fill" />
+        </div>
+      </Page>
     );
-  }
+
+    // 2. Schedule Pages
+    program.schedule.forEach((day, index) => {
+      pages.push(
+        <Page key={day._id || `day-${index}`} number={index + 2}>
+          <div className="flex flex-col h-full">
+            <header className="border-b-2 border-[#355E3B]/20 pb-3 mb-6">
+              <h2 className="text-[#355E3B] font-serif text-base font-bold uppercase">Day {day.day}</h2>
+              <p className="text-[#C5A059] text-[8px] font-black uppercase tracking-widest">
+                {day.date ? new Date(day.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+              </p>
+            </header>
+            <div className="flex-1 space-y-5 overflow-y-auto pr-2 custom-scrollbar">
+              {day.activities?.map((act, i) => (
+                <div key={i} className="flex gap-4 border-b border-slate-100 pb-3 items-start">
+                  <span className="text-[#C5A059] font-mono text-[9px] font-bold shrink-0 mt-1">{act.time}</span>
+                  <div className="flex-1">
+                    <p className="text-[11px] font-serif font-bold text-slate-800 leading-tight uppercase">{act.activity}</p>
+                    {act.facilitator && <p className="text-[9px] text-[#355E3B] mt-1 italic">{act.facilitator}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Page>
+      );
+    });
+    return pages;
+  }, [program]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] max-w-7xl mx-auto bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
-      <header className="p-6 md:p-8 border-b border-slate-100 shrink-0 bg-white">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="flex flex-col min-h-screen sm:h-[calc(100vh-140px)] max-w-7xl mx-auto bg-white sm:border border-slate-200 sm:rounded-[2.5rem] overflow-hidden shadow-sm">
+      <header className="p-4 sm:p-8 border-b border-slate-100 shrink-0 bg-white sticky top-0 z-50 sm:relative">
+        <div className="flex flex-col gap-6">
           <div className="flex items-center gap-4">
             <div className="w-1.5 h-10 bg-[#355E3B] rounded-full" />
             <div>
-              <p className="text-[#C5A059] text-[9px] font-black uppercase tracking-[0.2em] leading-none">
-                Republic of Kenya
-              </p>
-              <h1 className="text-[#355E3B] font-serif text-xl md:text-2xl font-bold tracking-tight mt-1">
-                Office of the Registrar High Court
-              </h1>
+              <p className="text-[#C5A059] text-[9px] font-black uppercase tracking-[0.3em]">Republic of Kenya</p>
+              <h1 className="text-[#355E3B] font-serif text-xl sm:text-2xl font-bold uppercase tracking-tight">Office of the Registrar High Court</h1>
             </div>
           </div>
-
-          <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full sm:w-fit shadow-inner">
             {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 md:px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
-                  activeTab === tab.id
-                    ? "bg-white text-[#355E3B] shadow-sm"
-                    : "text-slate-500 hover:text-[#355E3B]"
-                }`}
+              <button 
+                key={tab.id} 
+                onClick={() => setActiveTab(tab.id)} 
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-3 px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${activeTab === tab.id ? "bg-white text-[#355E3B] shadow-lg" : "text-slate-500 hover:text-slate-800"}`}
               >
-                {tab.icon} <span className="hidden sm:inline">{tab.label}</span>
+                {tab.icon} <span>{tab.label}</span>
               </button>
             ))}
           </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-6 md:p-10 bg-[#F8FAFC]/50 custom-scrollbar">
-        {activeTab === "BIO" && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {judges.map((judge) => (
-                <div
-                  key={judge._id}
-                  onClick={() => setSelectedJudge(judge)}
-                  className="group cursor-pointer bg-white border border-slate-200 p-5 rounded-3xl flex items-center gap-5 shadow-sm hover:shadow-md transition-all duration-300 border-b-4 hover:border-b-[#C5A059]"
-                >
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-slate-50 shadow-inner group-hover:scale-105 transition-transform shrink-0">
-                    <img
-                      src={judge.imageUrl}
-                      className="w-full h-full object-cover"
-                      alt={judge.name}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-[13px] font-serif font-bold text-[#355E3B] truncate">
-                      {judge.name}
-                    </h3>
-                    <p className="text-[8px] font-black text-[#C5A059] uppercase tracking-widest mt-0.5">
-                      {judge.title}
-                    </p>
-                    <span className="inline-flex items-center gap-1 text-slate-400 text-[8px] mt-2 font-bold uppercase group-hover:text-[#355E3B] transition-colors">
-                      View Profile <ChevronRight size={10} />
-                    </span>
-                  </div>
+      <main className="flex-1 overflow-y-auto p-4 sm:p-12 bg-[#F8FAFC]/30 custom-scrollbar relative">
+        {activeTab === "PROGRAM" && (
+          <div className="max-w-5xl mx-auto flex flex-col items-center">
+            {/* Countdown Lock Overlay */}
+            {isLocked ? (
+              <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-white/80 backdrop-blur-sm rounded-[3rem] border border-slate-100 shadow-xl animate-in fade-in zoom-in duration-700">
+                <div className="w-20 h-20 bg-[#355E3B] rounded-full flex items-center justify-center text-white mb-6 shadow-lg shadow-[#355E3B]/20">
+                  <Lock size={32} />
                 </div>
-              ))}
-            </div>
+                <h2 className="text-[#355E3B] font-serif text-2xl font-bold uppercase tracking-tight mb-2">Under Review</h2>
+                
+                <div className="flex gap-4">
+                  {timeLeft && [
+                    { val: timeLeft.h, label: "Hrs" },
+                    { val: timeLeft.m, label: "Min" },
+                    { val: timeLeft.s, label: "Sec" }
+                  ].map((unit, i) => (
+                    <div key={i} className="flex flex-col items-center">
+                      <div className="bg-slate-900 text-white w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black mb-1">
+                        {unit.val.toString().padStart(2, '0')}
+                      </div>
+                      <span className="text-[10px] font-black text-[#C5A059] uppercase tracking-widest">{unit.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : programPages.length > 0 ? (
+              /* @ts-ignore */
+              <HTMLFlipBook 
+                width={450} height={630} size="stretch" 
+                minWidth={300} maxWidth={900} 
+                minHeight={450} maxHeight={1200} 
+                drawShadow={true} usePortrait={true} 
+                mobileScrollSupport={true} 
+                className="book-container shadow-2xl"
+              >
+                {programPages}
+              </HTMLFlipBook>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                <BookOpen size={48} className="mb-4 opacity-20" />
+                <p className="text-sm font-serif italic">Loading Conference Program...</p>
+              </div>
+            )}
           </div>
         )}
 
-        {activeTab === "PRESENTATION" && (
-          <div className="max-w-3xl mx-auto space-y-4 animate-in fade-in zoom-in-95 duration-500">
-            {presentations.map((item) => (
-              <a
-                key={item._id}
-                href={item.fileUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-between p-5 bg-white border border-slate-200 rounded-2xl hover:border-[#355E3B] transition-all group shadow-sm"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-slate-50 rounded-xl text-[#355E3B] group-hover:bg-[#355E3B] group-hover:text-white transition-colors">
-                    {["mp4", "mpeg", "mov"].includes(
-                      item.fileType?.toLowerCase(),
-                    ) ? (
-                      <PlayCircle size={20} />
-                    ) : (
-                      <FileText size={20} />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-black text-[#355E3B] uppercase tracking-tight">
-                      {item.title}
-                    </p>
-                    <p className="text-[8px] text-slate-400 font-bold uppercase mt-1">
-                      {item.fileType} Resource
-                    </p>
-                  </div>
+        {activeTab === "BIO" && (
+           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            {judges.map((judge) => (
+              <div key={judge._id} onClick={() => setSelectedJudge(judge)} className="cursor-pointer bg-white border border-slate-200 p-4 rounded-3xl flex items-center gap-5 hover:border-[#C5A059] transition-all shadow-sm group">
+                <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 border border-slate-100 shadow-inner">
+                  <img src={judge.imageUrl} className="w-full h-full object-cover" alt={judge.name} />
                 </div>
-                <Download
-                  size={18}
-                  className="text-slate-300 group-hover:text-[#355E3B]"
-                />
-              </a>
+                <div className="min-w-0">
+                  <h3 className="text-[14px] font-serif font-bold text-[#355E3B] truncate">{judge.name}</h3>
+                  <p className="text-[9px] font-black text-[#C5A059] uppercase mt-0.5">{judge.title}</p>
+                </div>
+                <ChevronRight size={16} className="ml-auto text-slate-300 group-hover:text-[#355E3B]" />
+              </div>
             ))}
           </div>
         )}
 
-        {activeTab === "PROGRAM" && (
-          <div className="max-w-3xl mx-auto animate-in fade-in slide-in-from-right-4 duration-500">
-            <div
-              className={`rounded-3xl p-8 md:p-12 relative overflow-hidden transition-all duration-700 ${
-                program?.isLocked
-                  ? "bg-[#1e293b] text-white"
-                  : "bg-[#355E3B] text-white shadow-xl"
-              }`}
-            >
-              <div className="relative z-10">
-                <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                  <div>
-                    <h2 className="text-2xl font-serif font-bold text-[#C5A059]">
-                      {program?.isLocked ? "Under Review" : "Official Schedule"}
-                    </h2>
-                    <p className="text-white/40 text-[9px] font-bold uppercase tracking-[0.2em] mt-1">
-                      {program?.isLocked
-                        ? "Confidential until release"
-                        : "Verified Program"}
-                    </p>
+        {activeTab === "PRESENTATION" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">
+            {presentations.map((pres, idx) => (
+              <div key={pres._id || idx} className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-3 bg-[#355E3B]/5 rounded-2xl text-[#355E3B]">
+                    <PresentationIcon size={24} />
                   </div>
-                  {/* Download PDF button - only visible if not locked */}
-                  {program?.programFileUrl && !program?.isLocked && (
-                    <a
-                      href={program.programFileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="bg-[#C5A059] text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase flex items-center justify-center gap-2 hover:scale-105 transition-all shadow-lg"
-                    >
-                      <Download size={14} /> Download PDF
-                    </a>
-                  )}
+                  <a href={pres.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[10px] font-black uppercase text-[#C5A059] hover:text-[#355E3B]">
+                    View File <Download size={14} />
+                  </a>
                 </div>
-
-                {program?.isLocked ? (
-                  <div className="py-12 flex flex-col items-center">
-                    <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-full flex items-center justify-center mb-4">
-                      <Lock size={24} className="text-[#C5A059]" />
-                    </div>
-                    <h3 className="text-xl font-serif italic text-white/90">
-                      Awaiting Release
-                    </h3>
-                    {program.scheduledRelease && (
-                      <CountdownTimer targetDate={program.scheduledRelease} />
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {program?.items?.length > 0 ? (
-                      program.items.map((item, index) => (
-                        <div
-                          key={index}
-                          className="flex items-start gap-6 p-4 hover:bg-white/5 rounded-xl transition-all border-l border-white/10 group"
-                        >
-                          <div className="flex items-center gap-2 text-[#C5A059] font-mono text-[10px] w-24 shrink-0 mt-1">
-                            <Clock size={12} /> {item.time}
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="text-[15px] font-serif font-bold text-white/95 leading-snug group-hover:text-white">
-                              {item.event}
-                            </h4>
-                            <p className="text-white/30 text-[9px] font-bold uppercase mt-1 tracking-widest">
-                              {item.location}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-white/20 text-center py-10 italic">
-                        No items scheduled.
-                      </p>
-                    )}
-                  </div>
-                )}
+                <h3 className="text-lg font-serif font-bold text-slate-800 leading-tight mb-2 uppercase">{pres.title}</h3>
+                <p className="text-xs text-slate-500 italic">
+                  Presenter: {(pres as any).author || (pres as any).facilitator || (pres as any).presenter || "Judicial Secretariat"}
+                </p>
               </div>
-            </div>
+            ))}
           </div>
         )}
       </main>
 
-      <BioModal
-        isOpen={!!selectedJudge}
-        onClose={() => setSelectedJudge(null)}
-        data={selectedJudge}
-      />
+      <BioModal isOpen={!!selectedJudge} onClose={() => setSelectedJudge(null)} data={selectedJudge} />
     </div>
   );
 };

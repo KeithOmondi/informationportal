@@ -130,17 +130,7 @@ const JudgeSidebar = ({ isOpen, setIsOpen }: JudgeSidebarProps) => {
             Sign Out
           </button>
 
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="bg-[#355E3B] p-1.5 rounded-lg">
-                <ShieldCheck size={14} className="text-[#C5A059]"/>
-              </div>
-              <div className="flex flex-col">
-                <p className="text-[10px] text-[#355E3B] font-black leading-none uppercase">Secure Node</p>
-                <p className="text-[8px] text-slate-400 font-bold uppercase tracking-tight mt-1">Registrar High Court</p>
-              </div>
-            </div>
-          </div>
+          
         </div>
       </aside>
     </>
