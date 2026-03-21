@@ -114,18 +114,18 @@ const Login: React.FC = () => {
           <div className="absolute top-0 left-0 w-1 h-full bg-[#355E3B]" />
 
           <div className="mb-8">
-            <h2 className="text-lg font-bold text-slate-800 tracking-tight">
-              Officer Authentication
+            <h2 className="text-lg text-[#355E38] font-serif font-bold text-center text-slate-800 tracking-tight">
+              LOGIN PAGE
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Enter your official PJ Number to establish a secure session.
+            <p className="text-xs  text-center text-[#355E38] text-slate-500 mt-1">
+              Enter your PJ Number to access resources.
             </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">
-                Official PJ Number
+              PJ Number
               </label>
               <div className="relative mt-1.5">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
@@ -136,7 +136,7 @@ const Login: React.FC = () => {
                   value={pj}
                   onChange={(e) => setPj(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 focus:border-[#C5A059] rounded-xl pl-12 pr-4 py-3.5 text-sm font-semibold text-slate-800 outline-none transition-all"
-                  placeholder="e.g. PJ-12345"
+                  placeholder="e.g. 12345"
                   required
                 />
               </div>
