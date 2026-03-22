@@ -13,6 +13,8 @@ import {
   Edit3,
   Check,
   X,
+  Mail, // Added icon
+  Key,  // Added icon
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -27,8 +29,6 @@ import {
 
 type UserRole = "admin" | "judge" | "guest";
 
-// Identifying the Master Admin by PJ now instead of Email if necessary, 
-// but keeping your existing env variable logic for compatibility.
 const MASTER_ADMIN_EMAIL = import.meta.env.VITE_MASTER_ADMIN_EMAIL;
 
 const AdminUsers = () => {
@@ -36,16 +36,16 @@ const AdminUsers = () => {
   const { users, loading, error } = useAppSelector((state) => state.users);
   const { user: authUser } = useAppSelector((state) => state.auth);
 
-  // Authorization Check
   const isMasterAdmin = !!MASTER_ADMIN_EMAIL && authUser?.email === MASTER_ADMIN_EMAIL;
 
-  // New User State
+  // New User State (Added Email and Password)
   const [newUserName, setNewUserName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState(""); // New field
+  const [newUserPassword, setNewUserPassword] = useState(""); // New field
   const [newUserPJ, setNewUserPJ] = useState("");
   const [newUserCohort, setNewUserCohort] = useState<string>("");
   const [newUserRole, setNewUserRole] = useState<UserRole>("guest");
   
-  // Search & Edit State
   const [searchTerm, setSearchTerm] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: "", pj: "", cohort: "" });
@@ -64,14 +64,18 @@ const AdminUsers = () => {
 
   const handleCreateUser = async () => {
     if (!isMasterAdmin) return toast.error("Unauthorized: Master Admin access required");
-    if (!newUserName.trim() || !newUserPJ.trim()) {
-      return toast.error("Full Name and PJ Number are mandatory for registration");
+    
+    // Updated validation check
+    if (!newUserName.trim() || !newUserPJ.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
+      return toast.error("Name, Email, Password, and PJ Number are mandatory");
     }
 
     try {
       await dispatch(
         createAdminUser({
           name: newUserName.trim(),
+          email: newUserEmail.trim().toLowerCase(), // Included
+          password: newUserPassword, // Included
           pj: newUserPJ.trim().toUpperCase(),
           role: newUserRole,
           cohort: newUserCohort ? parseInt(newUserCohort) : undefined,
@@ -80,6 +84,8 @@ const AdminUsers = () => {
 
       toast.success(`${newUserRole.toUpperCase()} successfully onboarded`);
       setNewUserName("");
+      setNewUserEmail(""); // Reset
+      setNewUserPassword(""); // Reset
       setNewUserPJ("");
       setNewUserCohort("");
       setNewUserRole("guest");
@@ -147,7 +153,6 @@ const AdminUsers = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-[#F1F3F4] font-sans">
-      {/* HEADER */}
       <header className="bg-[#355E3B] text-white px-4 md:px-8 py-6 shadow-md border-b-4 border-[#EFBF04]">
         <div className="flex justify-between items-center max-w-7xl mx-auto w-full">
           <div className="flex items-center gap-3 md:gap-4">
@@ -165,10 +170,9 @@ const AdminUsers = () => {
         </div>
       </header>
 
-      {/* MAIN CONTENT */}
       <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 md:space-y-8">
         
-        {/* ONBOARDING SECTION */}
+        {/* ONBOARDING SECTION UPDATED WITH EMAIL/PASSWORD */}
         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
           {!isMasterAdmin && (
             <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center">
@@ -184,7 +188,7 @@ const AdminUsers = () => {
             <h2 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Onboard New Personnel</h2>
           </div>
 
-          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 items-end">
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Full Name</label>
               <input 
@@ -197,6 +201,34 @@ const AdminUsers = () => {
             </div>
 
             <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Email Address</label>
+              <div className="relative">
+                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input 
+                  type="email" 
+                  value={newUserEmail} 
+                  onChange={(e) => setNewUserEmail(e.target.value)} 
+                  placeholder="email@domain.com" 
+                  className="w-full pl-9 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#355E3B]/20" 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Password</label>
+              <div className="relative">
+                <Key size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input 
+                  type="password" 
+                  value={newUserPassword} 
+                  onChange={(e) => setNewUserPassword(e.target.value)} 
+                  placeholder="••••••••" 
+                  className="w-full pl-9 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#355E3B]/20" 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-1">PJ Number</label>
               <div className="relative">
                 <Fingerprint size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -205,20 +237,6 @@ const AdminUsers = () => {
                   value={newUserPJ} 
                   onChange={(e) => setNewUserPJ(e.target.value)} 
                   placeholder="PJ-XXXX" 
-                  className="w-full pl-9 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#355E3B]/20" 
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Cohort</label>
-              <div className="relative">
-                <GraduationCap size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input 
-                  type="number" 
-                  value={newUserCohort} 
-                  onChange={(e) => setNewUserCohort(e.target.value)} 
-                  placeholder="Year" 
                   className="w-full pl-9 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#355E3B]/20" 
                 />
               </div>
@@ -240,7 +258,7 @@ const AdminUsers = () => {
             <button 
               onClick={handleCreateUser} 
               disabled={loading} 
-              className="bg-[#355E3B] hover:bg-[#2a4b2f] text-white rounded-xl px-6 py-2.5 font-bold text-sm shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 h-[42px] disabled:opacity-50 w-full sm:col-span-2 md:col-span-1"
+              className="bg-[#355E3B] hover:bg-[#2a4b2f] text-white rounded-xl px-6 py-2.5 font-bold text-sm shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 h-[42px] disabled:opacity-50 w-full"
             >
               <UserPlus size={18} /> {loading ? "..." : "Register"}
             </button>
@@ -303,6 +321,7 @@ const AdminUsers = () => {
                           <div className="truncate">
                             <p className="font-bold text-slate-900 text-sm truncate">{user.name}</p>
                             <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight font-mono">PJ: {user.pj}</span>
+                            <p className="text-[10px] text-slate-400 lowercase">{user.email}</p>
                           </div>
                         )}
                       </div>

@@ -8,7 +8,7 @@ export interface IUser {
   _id: string;
   name: string;
   pj: string;
-  email?: string;
+  email: string; // Changed to required to match your validation needs
   role: "admin" | "judge" | "guest";
   cohort?: number;
   isActive: boolean;
@@ -78,7 +78,7 @@ export const fetchUsers = createAsyncThunk(
 
 export const createAdminUser = createAsyncThunk<
   IUser,
-  { name: string; pj: string; email?: string; password?: string; role: string; cohort?: number },
+  { name: string; pj: string; email: string; password: string; role: string; cohort?: number },
   { rejectValue: string }
 >(
   "users/createAdminUser",
@@ -87,6 +87,7 @@ export const createAdminUser = createAsyncThunk<
       const { data } = await api.post("/users/create", userData);
       return data.user as IUser;
     } catch (err: any) {
+      // Specifically target the validation error from your backend
       return thunkAPI.rejectWithValue(err.response?.data?.message || "Failed to create user");
     }
   }
@@ -152,9 +153,9 @@ const userSlice = createSlice({
       state.error = null;
     },
     resetUserSlice: (state) => {
-        state.profile = null;
-        state.users = [];
-        state.error = null;
+      state.profile = null;
+      state.users = [];
+      state.error = null;
     },
     addToActiveConversations: (state, action: PayloadAction<string>) => {
       if (!state.activeConversationIds.includes(action.payload)) {
@@ -191,9 +192,18 @@ const userSlice = createSlice({
         state.error = action.payload as string;
       })
 
-      /* CREATE */
+      /* CREATE ADMIN USER (Modified with Pending/Rejected) */
+      .addCase(createAdminUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(createAdminUser.fulfilled, (state, action: PayloadAction<IUser>) => {
+        state.loading = false;
         state.users.unshift(action.payload);
+      })
+      .addCase(createAdminUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       })
 
       /* DELETE */
@@ -210,16 +220,14 @@ const userSlice = createSlice({
         localStorage.setItem("active_chat_ids", JSON.stringify(ids));
       })
 
-      /* UPDATES (Matcher handles both simple role updates and deep detail edits) */
+      /* UPDATES */
       .addMatcher(
         (action) => [updateAdminUser.fulfilled.type, editAdminDetails.fulfilled.type].includes(action.type),
         (state, action: PayloadAction<IUser>) => {
-          // Update in the list
           const index = state.users.findIndex((u) => u._id === action.payload._id);
           if (index !== -1) {
             state.users[index] = action.payload;
           }
-          // Update the current user's profile if they edited themselves
           if (state.profile?._id === action.payload._id) {
             state.profile = action.payload;
           }
