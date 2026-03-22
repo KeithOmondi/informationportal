@@ -19,31 +19,39 @@ import Back from "../../assets/Back.png";
 /* =====================================================
     HELPERS
 ===================================================== */
-/* =====================================================
-    HELPERS
-===================================================== */
 const formatName = (str: string) => {
   if (!str) return "";
+
+  // 1. Define specific honorifics that must be ALL CAPS
+  const upperHonors = ["EBS", "OGW", "PHD", "SC", "SCJ", "CBS", "EGH", "FCI", "ARB"];
   
-  // Added "RTD" to this list so the formatter treats it as an acronym/honorific
-  const honors = ["EBS", "OGW", "PHD", "SC", "SCJ", "CBS", "EGH", "FCI", "ARB", "H.E", "H.E.", "RTD"];
-  
+  // 2. Define specific honorifics that need Mixed Case or specific handling
+  const mixedHonors: Record<string, string> = {
+    "DR": "Dr.",
+    "DR.": "Dr.",
+    "RTD": "Rtd",
+    "RTD.": "Rtd.",
+    "H.E": "H.E.",
+    "H.E.": "H.E."
+  };
+
   return str.split(" ").map((word) => {
-      // Remove parentheses and punctuation to check against the honors list
-      const cleanWord = word.toUpperCase().replace(/[^A-Z.]/g, "");
+      // Remove parentheses and punctuation to check the core word (e.g., "(rtd.)" -> "RTD")
+      const cleanWord = word.toUpperCase().replace(/[^A-Z.]/g, "").replace(/\.$/, "");
       
-      if (honors.includes(cleanWord)) {
-        // If it's an honorific like (Rtd.), preserve the capital R and lower case letters 
-        // OR simply return the word as-is if it matches our list perfectly.
-        if (cleanWord === "RTD") {
-            return word.replace(/rtd/i, "Rtd");
-        }
-        return word.toUpperCase();
+      // Handle All-Caps honors
+      if (upperHonors.includes(cleanWord)) return word.toUpperCase();
+      
+      // Handle Mixed-Case honors specifically (fixing the "rtd" issue)
+      if (mixedHonors[cleanWord] || cleanWord === "RTD") {
+        // Use regex to find 'rtd' case-insensitively and replace with 'Rtd'
+        // This preserves surrounding brackets or dots: "(rtd.)" -> "(Rtd.)"
+        return word.replace(/rtd/i, "Rtd");
       }
       
-      if (cleanWord === "DR" || cleanWord === "DR.") return "Dr.";
+      if (cleanWord === "DR") return "Dr.";
       
-      // Default: Sentence Case
+      // Default: Sentence Case for standard names
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     }).join(" ");
 };
@@ -157,7 +165,6 @@ const JudgesReligion = () => {
     const scheduleArray = program?.schedule || (Array.isArray(program) ? program : []);
     
     if (scheduleArray.length > 0) {
-      // Increased weight ensures pages are filled to the bottom
       const MAX_PAGE_WEIGHT = 1600; 
       const MIN_ITEMS_PER_PAGE = 1;
 
@@ -187,7 +194,7 @@ const JudgesReligion = () => {
       });
     }
 
-    // 2. BACK COVER (Removed filler/blank page logic)
+    // 2. BACK COVER
     pages.push(
       <Page key="back-cover" number={pageCounter++} isCover={true}>
         <div className="absolute inset-0 w-full h-full">
