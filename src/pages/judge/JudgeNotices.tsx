@@ -188,7 +188,7 @@ const JudgeNoticesPage = () => {
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-slate-50 rounded-lg text-[#C5A059]"><User size={16} /></div>
                       <div>
-                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Issuing Authority</p>
+                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Published By</p>
                         <p className="text-[11px] font-bold text-slate-600 uppercase">
                           {notice.createdBy?.name || "Registry System"}
                         </p>
