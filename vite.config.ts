@@ -1,15 +1,17 @@
-import { defineConfig } from "vite"; // 👈 removed loadEnv
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 
-export default defineConfig({ // 👈 back to object form
+export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      devOptions: { enabled: true },
+      devOptions: { 
+        enabled: false, // 👈 disable in dev — test PWA with npm run build && npm run preview
+      },
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',

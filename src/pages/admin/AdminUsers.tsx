@@ -8,7 +8,6 @@ import {
   Search,
   RefreshCw,
   Lock,
-  GraduationCap,
   Fingerprint,
   Edit3,
   Check,
