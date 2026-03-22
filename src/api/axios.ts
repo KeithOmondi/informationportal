@@ -1,4 +1,5 @@
 import axios, { type AxiosRequestConfig } from "axios";
+import { savePendingRequest } from "../lib/syncDB"; // 👈 added
 
 interface FailedRequest {
   resolve: (value: any) => void;
@@ -27,16 +28,38 @@ const processQueue = (error: any = null) => {
   failedQueue = [];
 };
 
+// 👇 helper to register background sync
+const registerBackgroundSync = async () => {
+  if ('serviceWorker' in navigator && 'SyncManager' in window) {
+    const reg = await navigator.serviceWorker.ready
+    await reg.sync.register('sync-pending-requests')
+  }
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (!error.response) return Promise.reject(error);
+
+    // 👇 No response = offline — save POST/PUT requests for background sync
+    if (!error.response) {
+      const method = originalRequest.method?.toUpperCase()
+      if (method === 'POST' || method === 'PUT') {
+        await savePendingRequest({
+          url: `${import.meta.env.VITE_API_URL}${originalRequest.url}`,
+          method,
+          body: typeof originalRequest.data === 'string'
+            ? originalRequest.data
+            : JSON.stringify(originalRequest.data ?? {}),
+          headers: (originalRequest.headers as Record<string, string>) ?? {}
+        })
+        await registerBackgroundSync()
+      }
+      return Promise.reject(error)
+    }
 
     const status = error.response.status;
     const errorMessage = error.response?.data?.message || "";
-    
-    // Check if the failed request was an AUTH endpoint
     const isAuthPath = originalRequest.url?.includes("/auth/");
 
     /* --- 1. THE SECURITY KICKOUT --- */
@@ -49,8 +72,6 @@ api.interceptors.response.use(
 
     /* --- 2. THE REFRESH LOGIC --- */
     if (status === 401 && !originalRequest._retry) {
-      // CRITICAL: If the 401 came from LOGIN or REFRESH, don't intercept.
-      // This stops the "Instant Logout" on a fresh login.
       if (isAuthPath) {
         return Promise.reject(error);
       }
@@ -65,18 +86,14 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Use standard axios for the refresh call to avoid interceptor recursion
         await axios.post(`${import.meta.env.VITE_API_URL}/auth/refresh`, {}, { withCredentials: true });
-        
         isRefreshing = false;
         processQueue(null);
         return api.request(originalRequest);
       } catch (refreshErr: any) {
         isRefreshing = false;
         processQueue(refreshErr);
-        
-        // Only trigger logout if a DATA request failed and REFRESH also failed
-        logoutHandler(); 
+        logoutHandler();
         return Promise.reject(refreshErr);
       }
     }

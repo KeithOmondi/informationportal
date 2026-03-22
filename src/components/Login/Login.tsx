@@ -6,6 +6,7 @@ import { UserCircle, ArrowRight, Scale, ShieldCheck } from "lucide-react";
 import type { RootState } from "../../store/store";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { clearError, loginUser } from "../../store/slices/adminAuthSlice";
+import { initPushSubscription } from "../../store/slices/notificationSlice";
 
 const Login: React.FC = () => {
   const [pj, setPj] = useState("");
@@ -71,8 +72,11 @@ const Login: React.FC = () => {
       ).unwrap();
 
       toast.success("Identity Verified", { id: toastId });
+
+      // 👇 Subscribe to push notifications after successful login
+      dispatch(initPushSubscription())
+
     } catch (err: any) {
-      // The error is already handled by the slice, but unwrap() lets us catch it here for the toast
       toast.error(err?.message || "Invalid PJ Number", { id: toastId });
     }
   };

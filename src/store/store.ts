@@ -17,7 +17,8 @@ import ceremonyReducer from "./slices/swearingPreferenceSlice";
 import galleryReducer from "./slices/gallerySlice";
 import programReducer from "./slices/programSlice";
 import presentationsReducer from "./slices/presentationSlice"
-
+import notificationsReducer from "./slices/notificationSlice"
+  
 export const store = configureStore({
   reducer: {
     auth: authReducer,
@@ -33,7 +34,8 @@ export const store = configureStore({
     ceremony: ceremonyReducer,
     gallery: galleryReducer,
     program: programReducer,
-    presentations: presentationsReducer
+    presentations: presentationsReducer,
+    notifications: notificationsReducer
   },
 });
 

@@ -11,8 +11,6 @@ import {
   Lock,
   Loader2,
   FileText,
-  Video,
-  Image as ImageIcon,
 } from "lucide-react";
 import type { AppDispatch, RootState } from "../../store/store";
 import { fetchProgram } from "../../store/slices/programSlice";
@@ -20,6 +18,7 @@ import { fetchCeremonyInfo, type Judge } from "../../store/slices/swearingPrefer
 import { fetchPresentations, type Presentation } from "../../store/slices/presentationSlice";
 
 import CoverP from "../../assets/CoverP.png";
+import Back from "../../assets/Back.png";
 
 /* =====================================================
     FLIPBOOK PAGE COMPONENT
@@ -80,24 +79,22 @@ const JudgesReligion = () => {
   const dispatch = useDispatch<AppDispatch>();
   const isInitialMount = useRef(true);
   
-  // SELECTORS
-  const { program, loading: programLoading, isInitialLoading } = useSelector((state: RootState) => state.program);
+  const { program, isInitialLoading } = useSelector((state: RootState) => state.program);
   const { judges } = useSelector((state: RootState) => state.ceremony);
-  const { items: presentations, loading: presLoading } = useSelector((state: RootState) => state.presentations);
+  const { items: presentations } = useSelector((state: RootState) => state.presentations);
 
   const [activeTab, setActiveTab] = useState("PROGRAM");
   const [selectedJudge, setSelectedJudge] = useState<Judge | null>(null);
   const [bookSize, setBookSize] = useState({ width: 450, height: 630 });
   const [timeLeft, setTimeLeft] = useState({ h: 0, m: 0, s: 0 });
 
-  // 1. Responsive Book Sizing
   useEffect(() => {
     const updateSize = () => {
       if (window.innerWidth < 640) {
         const w = window.innerWidth - 32;
         setBookSize({ width: w, height: w * 1.45 });
       } else {
-        setBookSize({ width: 480, height: 680 }); // Slightly larger base size
+        setBookSize({ width: 480, height: 680 });
       }
     };
     updateSize();
@@ -105,7 +102,6 @@ const JudgesReligion = () => {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  // 2. Initial Data Loading
   useEffect(() => {
     if (isInitialMount.current) {
       dispatch(fetchCeremonyInfo());
@@ -115,11 +111,9 @@ const JudgesReligion = () => {
     }
   }, [dispatch]);
 
-  // 3. Dynamic Timer Logic (FIXED DEPENDENCY ARRAY)
   useEffect(() => {
     const releaseTime = program?.scheduledRelease;
     const isLocked = program?.isLocked;
-
     if (!releaseTime || !isLocked) return;
 
     const timer = setInterval(() => {
@@ -138,17 +132,19 @@ const JudgesReligion = () => {
         });
       }
     }, 1000);
-
     return () => clearInterval(timer);
   }, [program?.scheduledRelease, program?.isLocked, dispatch]);
 
-  // 4. Page Rendering Logic (UPDATED FONT SIZES & GAPS)
-  const programPages = useMemo(() => {
-    if (!program?.schedule || program.schedule.length === 0) return [];
+  // Combined key for the flipbook container to force clean re-mounts
+  const flipbookKey = useMemo(() => {
+    return `fb-${activeTab}-${program?.schedule?.length || 0}-${program?.isLocked ? 'L' : 'U'}`;
+  }, [activeTab, program]);
 
+  const programPages = useMemo(() => {
     const pages: JSX.Element[] = [];
     let pageCounter = 1;
 
+    // 1. Cover Page
     pages.push(
       <Page key="cover" number={pageCounter++} isCover={true}>
         <div className="absolute inset-0 w-full h-full">
@@ -157,30 +153,62 @@ const JudgesReligion = () => {
       </Page>
     );
 
-    const MAX_PAGE_WEIGHT = 950; // Higher weight to allow larger spacing
-    const MIN_ITEMS_PER_PAGE = 4; // Ensure each page has at least 4 items
+    const scheduleArray = program?.schedule || (Array.isArray(program) ? program : []);
+    
+    if (scheduleArray.length === 0) {
+      pages.push(
+        <Page key="placeholder" number={pageCounter++}>
+          <div className="flex flex-col items-center justify-center h-full text-center p-8">
+            <BookOpen className="w-12 h-12 text-[#355E3B] opacity-10 mb-4" />
+            <h2 className="font-serif text-lg text-[#355E3B] uppercase tracking-tighter font-bold">Conference Programme</h2>
+            <p className="text-[10px] text-slate-400 mt-2 font-black uppercase tracking-widest">Awaiting Synchronization...</p>
+          </div>
+        </Page>
+      );
+    } else {
+      const MAX_PAGE_WEIGHT = 950;
+      const MIN_ITEMS_PER_PAGE = 3;
 
-    program.schedule.forEach((day, dayIdx) => {
-      let currentPageActivities: any[] = [];
-      let currentWeight = 0;
+      scheduleArray.forEach((day: any, dayIdx: number) => {
+        let currentPageActivities: any[] = [];
+        let currentWeight = 0;
+        const activities = day.activities || [];
 
-      day.activities?.forEach((act: any) => {
-        const itemWeight = (act.activity?.length || 0) + (act.facilitator?.length || 0) + 120;
-        
-        if (currentWeight + itemWeight > MAX_PAGE_WEIGHT && currentPageActivities.length >= MIN_ITEMS_PER_PAGE) {
-          pages.push(renderSchedulePage(day, currentPageActivities, pageCounter++, true, dayIdx));
-          currentPageActivities = [];
-          currentWeight = 0;
+        activities.forEach((act: any) => {
+          const itemWeight = (act.activity?.length || 0) + (act.facilitator?.length || 0) + 120;
+          if (currentWeight + itemWeight > MAX_PAGE_WEIGHT && currentPageActivities.length >= MIN_ITEMS_PER_PAGE) {
+            pages.push(renderSchedulePage(day, currentPageActivities, pageCounter++, true, dayIdx));
+            currentPageActivities = [];
+            currentWeight = 0;
+          }
+          currentPageActivities.push(act);
+          currentWeight += itemWeight;
+        });
+
+        if (currentPageActivities.length > 0) {
+          const isContinuation = activities.length > 0 && currentPageActivities[0] !== activities[0];
+          pages.push(renderSchedulePage(day, currentPageActivities, pageCounter++, isContinuation, dayIdx));
         }
-        currentPageActivities.push(act);
-        currentWeight += itemWeight;
       });
+    }
 
-      if (currentPageActivities.length > 0) {
-        const isActuallyContinuation = day.activities && currentPageActivities[0] !== day.activities[0];
-        pages.push(renderSchedulePage(day, currentPageActivities, pageCounter++, isActuallyContinuation, dayIdx));
-      }
-    });
+    // 2. Ensure even number of pages so back cover is on the right
+    if (pages.length % 2 !== 0) {
+        pages.push(
+          <Page key={`filler-${pageCounter}`} number={pageCounter++}>
+             <div className="flex items-center justify-center h-full opacity-5 font-serif text-[10px]">End of Program</div>
+          </Page>
+        );
+    }
+
+    // 3. Back Page with Image
+    pages.push(
+      <Page key="back-cover" number={pageCounter++} isCover={true}>
+        <div className="absolute inset-0 w-full h-full">
+          <img src={Back} alt="Back Cover" className="w-full h-full object-cover" />
+        </div>
+      </Page>
+    );
 
     return pages;
   }, [program]);
@@ -197,9 +225,8 @@ const JudgesReligion = () => {
               {day.date ? new Date(day.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
             </p>
           </header>
-          
           <div className="flex-1 flex flex-col space-y-6">
-            {activities.map((act, i) => (
+            {activities.map((act: any, i: number) => (
               <div key={i} className="flex gap-5 border-b border-slate-100/60 pb-4 last:border-0 items-start">
                 <span className="text-[#355E3B] font-mono text-[10px] sm:text-[12px] font-bold shrink-0 mt-1 bg-slate-100/50 px-2 py-0.5 rounded">
                   {act.time}
@@ -222,28 +249,6 @@ const JudgesReligion = () => {
     );
   }
 
-  const tabs = [
-    { id: "PROGRAM", label: "Program", icon: <BookOpen size={14} /> },
-    { id: "BIO", label: "Bio", icon: <User size={14} /> },
-    { id: "PRESENTATION", label: "Presentations", icon: <PresentationIcon size={14} /> },
-  ];
-
-  const getFileIcon = (type: string) => {
-    switch (type) {
-      case "video": return <Video size={24} />;
-      case "image": return <ImageIcon size={24} />;
-      default: return <FileText size={24} />;
-    }
-  };
-
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
-
   return (
     <div className="flex flex-col min-h-screen sm:h-[calc(100vh-140px)] max-w-7xl mx-auto bg-white sm:border border-slate-200 sm:rounded-[2.5rem] overflow-hidden shadow-sm">
       <header className="p-4 sm:p-8 border-b border-slate-100 shrink-0 bg-white sticky top-0 z-50 sm:relative">
@@ -256,7 +261,11 @@ const JudgesReligion = () => {
             </div>
           </div>
           <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full sm:w-fit shadow-inner overflow-x-auto no-scrollbar">
-            {tabs.map((tab) => (
+            {[
+              { id: "PROGRAM", label: "Program", icon: <BookOpen size={14} /> },
+              { id: "BIO", label: "Bio", icon: <User size={14} /> },
+              { id: "PRESENTATION", label: "Presentations", icon: <PresentationIcon size={14} /> },
+            ].map((tab) => (
               <button 
                 key={tab.id} 
                 onClick={() => setActiveTab(tab.id)} 
@@ -271,64 +280,48 @@ const JudgesReligion = () => {
 
       <main className="flex-1 overflow-y-auto p-4 sm:p-12 bg-[#F8FAFC]/30">
         {activeTab === "PROGRAM" && (
-          <div className="max-w-5xl mx-auto flex flex-col items-center">
+          <div key="program-container" className="max-w-5xl mx-auto flex flex-col items-center">
             {isInitialLoading && !program ? (
                <div className="flex flex-col items-center justify-center py-20">
                 <Loader2 className="animate-spin text-[#355E3B]" size={32} />
-                <p className="mt-4 text-[10px] text-slate-400 font-black uppercase tracking-widest">Validating Program Access...</p>
                </div>
             ) : program?.isLocked ? (
-              <div className="w-full max-w-md flex flex-col items-center justify-center py-12 px-6 bg-white rounded-[2.5rem] shadow-xl border border-slate-100 text-center animate-in fade-in zoom-in duration-500">
-                <div className="w-20 h-20 bg-[#355E3B] rounded-full flex items-center justify-center text-white mb-6 shadow-lg shadow-[#355E3B]/20">
+              <div className="w-full max-w-md flex flex-col items-center justify-center py-12 px-6 bg-white rounded-[2.5rem] shadow-xl border border-slate-100 text-center">
+                <div className="w-20 h-20 bg-[#355E3B] rounded-full flex items-center justify-center text-white mb-6">
                   <Lock size={32} />
                 </div>
-                <h2 className="text-[#355E3B] font-serif text-xl font-bold uppercase tracking-tight mb-6">Under Review</h2>
+                <h2 className="text-[#355E3B] font-serif text-xl font-bold uppercase mb-6">Under Review</h2>
                 <div className="flex gap-4">
-                  {[
-                    { val: timeLeft.h, label: "Hrs" },
-                    { val: timeLeft.m, label: "Min" },
-                    { val: timeLeft.s, label: "Sec" }
-                  ].map((unit, i) => (
+                  {[{ val: timeLeft.h, label: "Hrs" }, { val: timeLeft.m, label: "Min" }, { val: timeLeft.s, label: "Sec" }].map((unit, i) => (
                     <div key={i} className="flex flex-col items-center">
-                      <div className="bg-slate-900 text-white w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black mb-1">
-                        {unit.val.toString().padStart(2, '0')}
-                      </div>
-                      <span className="text-[9px] font-black text-[#C5A059] uppercase tracking-widest">{unit.label}</span>
+                      <div className="bg-slate-900 text-white w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black mb-1">{unit.val.toString().padStart(2, '0')}</div>
+                      <span className="text-[9px] font-black text-[#C5A059] uppercase">{unit.label}</span>
                     </div>
                   ))}
                 </div>
               </div>
-            ) : programPages.length > 0 ? (
-              <div className="relative animate-in fade-in slide-in-from-bottom-4 duration-700">
-                {programLoading && (
-                  <div className="absolute -top-8 right-0 flex items-center gap-2">
-                    <Loader2 className="animate-spin text-[#355E3B]" size={12} />
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Updating...</span>
-                  </div>
-                )}
+            ) : (
+              // Using a stable key on the wrapper prevents React from crashing during DOM manipulation
+              <div key={flipbookKey} className="relative animate-in fade-in slide-in-from-bottom-4 duration-700">
                 {/* @ts-ignore */}
                 <HTMLFlipBook 
                   width={bookSize.width} height={bookSize.height}
                   size="fixed" drawShadow={true} usePortrait={true} 
                   mobileScrollSupport={true} className="book-container shadow-2xl"
+                  startPage={0}
                 >
                   {programPages}
                 </HTMLFlipBook>
                 <p className="mt-4 text-center text-[10px] text-slate-400 font-serif italic">Swipe or tap corners to flip pages</p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                <BookOpen size={48} className="mb-4 opacity-20" />
-                <p className="text-sm font-serif italic">The program is currently being finalized.</p>
               </div>
             )}
           </div>
         )}
 
         {activeTab === "BIO" && (
-           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto pb-10">
+           <div key="bio-container" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto pb-10">
             {judges.map((judge) => (
-              <div key={judge._id} onClick={() => setSelectedJudge(judge)} className="cursor-pointer bg-white border border-slate-200 p-4 rounded-3xl flex items-center gap-5 hover:border-[#C5A059] transition-all shadow-sm group">
+              <div key={judge._id} onClick={() => setSelectedJudge(judge)} className="cursor-pointer bg-white border border-slate-200 p-4 rounded-3xl flex items-center gap-5 hover:border-[#C5A059] transition-all group">
                 <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 border border-slate-100">
                   <img src={judge.imageUrl} className="w-full h-full object-cover" alt={judge.name} />
                 </div>
@@ -343,37 +336,21 @@ const JudgesReligion = () => {
         )}
 
         {activeTab === "PRESENTATION" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto pb-10">
-            {presLoading ? (
-              <div className="col-span-full flex justify-center py-20">
-                <Loader2 className="animate-spin text-[#355E3B]" size={32} />
-              </div>
-            ) : presentations.length > 0 ? (
-              presentations.map((pres: Presentation) => (
-                <div key={pres._id} className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 bg-[#355E3B]/5 rounded-2xl text-[#355E3B]">{getFileIcon(pres.fileType)}</div>
-                    <a href={pres.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[10px] font-black uppercase text-[#C5A059] hover:text-[#355E3B]">
-                      Download <Download size={14} />
-                    </a>
-                  </div>
-                  <h3 className="text-lg font-serif font-bold text-slate-800 leading-tight mb-1 uppercase line-clamp-2">{pres.title}</h3>
-                  <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50">
-                    <span className="text-[9px] font-black text-[#355E3B]/60 uppercase tracking-widest">{pres.fileType}</span>
-                    <span className="text-[9px] font-black text-slate-400 uppercase">{formatSize(pres.fileSize)}</span>
-                  </div>
+          <div key="presentation-container" className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto pb-10">
+            {presentations.map((pres: Presentation) => (
+              <div key={pres._id} className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-3 bg-[#355E3B]/5 rounded-2xl text-[#355E3B]"><FileText size={24} /></div>
+                  <a href={pres.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[10px] font-black uppercase text-[#C5A059]">
+                    Download <Download size={14} />
+                  </a>
                 </div>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-20 text-slate-400 font-serif italic">
-                <PresentationIcon size={48} className="mx-auto mb-4 opacity-10" />
-                <p>No conference materials available at this time.</p>
+                <h3 className="text-lg font-serif font-bold text-slate-800 leading-tight mb-1 uppercase line-clamp-2">{pres.title}</h3>
               </div>
-            )}
+            ))}
           </div>
         )}
       </main>
-
       <BioModal isOpen={!!selectedJudge} onClose={() => setSelectedJudge(null)} data={selectedJudge} />
     </div>
   );

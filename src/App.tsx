@@ -8,6 +8,7 @@ import { store, type AppDispatch, type RootState } from "./store/store";
 import { disconnectSocket, initSocket } from "./services/socket";
 import { Loader2 } from "lucide-react";
 import { refreshUser } from "./store/slices/adminAuthSlice";
+import InstallButton from "./components/InstallButton";
 
 /* =====================================================
     APP CONTENT
@@ -16,35 +17,22 @@ import { refreshUser } from "./store/slices/adminAuthSlice";
 const AppContent = () => {
   const dispatch = useDispatch<AppDispatch>();
 
-  // Refs to track initialization and prevent duplicate calls
   const socketInitialized = useRef(false);
   const authChecked = useRef(false);
 
   const { user, isInitialized } = useSelector((state: RootState) => state.auth);
 
-  /* =====================================================
-      AUTH SESSION RESTORE (Refined)
-      Prevents race conditions where background fetches hit 
-      401s before the session is fully marked as 'ready'.
-  ===================================================== */
   useEffect(() => {
-    // 1. If we are already initialized (from login or a previous refresh), stop.
     if (isInitialized) {
       authChecked.current = true;
       return;
     }
-
-    // 2. If we haven't checked the session yet, do it once.
     if (!authChecked.current) {
       authChecked.current = true;
       dispatch(refreshUser());
     }
   }, [dispatch, isInitialized]);
 
-  /* =====================================================
-      SOCKET MANAGEMENT
-      Strictly synced with the user's presence.
-  ===================================================== */
   useEffect(() => {
     if (user?._id) {
       if (!socketInitialized.current) {
@@ -52,15 +40,11 @@ const AppContent = () => {
         socketInitialized.current = true;
       }
     } else {
-      // If user logs out or session is lost, cleanup immediately
       disconnectSocket();
       socketInitialized.current = false;
     }
   }, [user?._id]);
 
-  /* =====================================================
-      INITIAL LOADING STATE
-  ===================================================== */
   if (!isInitialized) {
     return (
       <div className="min-h-screen bg-[#060b13] flex flex-col items-center justify-center gap-4">
@@ -75,6 +59,7 @@ const AppContent = () => {
   return (
     <>
       <AppRoutes />
+      <InstallButton />
     </>
   );
 };
@@ -88,7 +73,6 @@ const App = () => {
     <Provider store={store}>
       <BrowserRouter>
         <AppContent />
-
         <Toaster
           position="top-right"
           toastOptions={{
