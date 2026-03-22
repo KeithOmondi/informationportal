@@ -182,7 +182,7 @@ const JudgeDashboardPage = () => {
             <StatCard
               title="Notices"
               value={activeNotices.length}
-              subtext={urgentNoticesCount > 0 ? `${urgentNoticesCount} Priority Action` : "Registry Overview"}
+              subtext={urgentNoticesCount > 0 ? `${urgentNoticesCount} Priority Action` : "Notices Overview"}
               loading={noticesLoading && notices.length === 0}
               urgent={urgentNoticesCount > 0}
             />
@@ -192,7 +192,7 @@ const JudgeDashboardPage = () => {
             <StatCard
               title="Messages"
               value={messageStats.unread}
-              subtext={messageStats.unread > 0 ? `${messageStats.unread} New Alerts` : "No pending mail"}
+              subtext={messageStats.unread > 0 ? `${messageStats.unread} New Alerts` : "No pending message"}
               loading={chatLoading && groups.length === 0}
               urgent={messageStats.unread > 0}
             />

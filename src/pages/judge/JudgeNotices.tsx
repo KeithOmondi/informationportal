@@ -1,14 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Download,
-  Eye,
   Search,
   AlertCircle,
   Calendar,
   User,
-  Inbox
+  Inbox,
+  CheckCircle
 } from "lucide-react";
-import debounce from "lodash/debounce"; // Recommended: npm install lodash
+import debounce from "lodash/debounce";
 
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
@@ -26,7 +26,6 @@ const JudgeNoticesPage = () => {
 
   const categories: ("ALL" | NoticePriority)[] = ["ALL", "NORMAL", "URGENT"];
 
-  // Debounced Search Implementation
   const debouncedFetch = useCallback(
     debounce((currentFilter: string, currentSearch: string) => {
       const params: any = {};
@@ -39,7 +38,6 @@ const JudgeNoticesPage = () => {
 
   useEffect(() => {
     debouncedFetch(filter, search);
-    // Cleanup debounce on unmount
     return () => debouncedFetch.cancel();
   }, [filter, search, debouncedFetch]);
 
@@ -48,32 +46,66 @@ const JudgeNoticesPage = () => {
     return `${(size / (1024 * 1024)).toFixed(2)} MB`;
   };
 
+  /**
+   * DESCRIPTION RENDERING LOGIC
+   * Matches the Admin Preview logic to ensure consistency
+   */
+  const renderFormattedDescription = (text: string) => {
+    return text.split("\n").map((line, i) => {
+      const trimmedLine = line.trim();
+      
+      // Check for bullet points (-, *, •)
+      if (trimmedLine.startsWith("-") || trimmedLine.startsWith("*") || trimmedLine.startsWith("•")) {
+        return (
+          <li key={i} className="ml-5 list-disc text-slate-600 mb-1 pl-2">
+            {trimmedLine.substring(1).trim()}
+          </li>
+        );
+      }
+      
+      // Handle empty lines as spacing
+      if (trimmedLine === "") {
+        return <div key={i} className="h-4" />;
+      }
+
+      // Standard Paragraph
+      return (
+        <p key={i} className="mb-3 text-slate-600 leading-relaxed font-medium">
+          {line}
+        </p>
+      );
+    });
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 lg:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 font-['Nunito',sans-serif]">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 lg:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans">
       
       {/* HEADER */}
-      <div className="border-b border-slate-200 pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="text-center md:text-left">
-          <h1 className="text-[#355E3B] font-serif text-2xl md:text-3xl lg:text-4xl font-extrabold mb-2 tracking-tight">
-            ORHC Notice Board
+      <div className="border-b border-slate-200 pb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="text-left">
+          <h1 className="text-[#355E3B] font-serif text-3xl md:text-4xl font-black mb-2 tracking-tight">
+            Judicial Notice Board
           </h1>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
-            Official Registry High Court Information Portal
-          </p>
+          <div className="flex items-center gap-2">
+            <CheckCircle size={14} className="text-[#C5A059]" />
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
+              Official Registry Verified Communications
+            </p>
+          </div>
         </div>
       </div>
 
       {/* FILTER + SEARCH */}
       <div className="flex flex-col lg:flex-row gap-5">
-        <div className="flex w-full gap-2 lg:w-auto">
+        <div className="flex w-full gap-2 lg:w-auto p-1 bg-slate-100 rounded-2xl">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setFilter(cat)}
-              className={`flex-1 lg:flex-none lg:px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all border text-center ${
+              className={`flex-1 lg:flex-none lg:px-10 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                 filter === cat
-                  ? "bg-[#355E3B] border-[#355E3B] text-white shadow-lg shadow-[#355E3B]/20 scale-[1.02]"
-                  : "bg-white border-slate-200 text-slate-400 hover:border-[#355E3B]/30"
+                  ? "bg-white text-[#355E3B] shadow-sm scale-[1.02]"
+                  : "text-slate-400 hover:text-slate-600"
               }`}
             >
               {cat}
@@ -82,91 +114,85 @@ const JudgeNoticesPage = () => {
         </div>
 
         <div className="relative flex-1">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+          <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search titles, descriptions, or cause numbers..."
-            className="w-full pl-14 pr-6 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-semibold focus:ring-4 focus:ring-[#355E3B]/5 focus:border-[#355E3B] transition-all outline-none placeholder:text-slate-300 shadow-sm"
+            placeholder="Search documents, circulars or registry records..."
+            className="w-full pl-16 pr-6 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-semibold focus:ring-4 focus:ring-[#355E3B]/5 focus:border-[#355E3B] transition-all outline-none shadow-sm"
           />
         </div>
       </div>
 
-      {/* GRID/LIST */}
-      <div className="grid gap-8">
+      {/* LISTING */}
+      <div className="space-y-8">
         {loading && notices.length === 0 ? (
           <div className="py-32 flex flex-col items-center justify-center space-y-4">
-             <div className="w-12 h-12 border-4 border-[#355E3B]/10 border-t-[#355E3B] rounded-full animate-spin" />
-             <span className="text-slate-400 font-black uppercase tracking-widest text-[11px]">Synchronizing Registry...</span>
+             <LoaderIcon />
           </div>
         ) : notices.length === 0 ? (
-          <div className="py-32 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center px-6">
-            <Inbox className="text-slate-300 mb-4" size={48} />
-            <h3 className="text-slate-600 font-bold text-lg">No Records Found</h3>
-            <p className="text-slate-400 text-sm max-w-xs">We couldn't find any notices matching your current search or filter criteria.</p>
+          <div className="py-32 bg-slate-50 rounded-[40px] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center px-6">
+            <Inbox className="text-slate-200 mb-4" size={64} />
+            <h3 className="text-slate-500 font-black uppercase tracking-widest text-xs">No Records Found</h3>
           </div>
         ) : (
           notices.map((notice) => (
             <div
               key={notice._id}
-              className="group bg-white border border-slate-200 rounded-3xl overflow-hidden hover:shadow-2xl hover:border-[#355E3B]/20 transition-all duration-500"
+              className="group bg-white border border-slate-200 rounded-[32px] overflow-hidden hover:shadow-2xl hover:shadow-[#355E3B]/5 transition-all duration-500"
             >
-              <div className="p-6 lg:p-12">
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-tighter ${
-                        notice.priority === "URGENT"
-                          ? "bg-red-50 text-red-600 border border-red-100"
-                          : "bg-[#355E3B]/5 text-[#355E3B] border border-[#355E3B]/10"
-                      }`}
-                    >
+              <div className="p-8 lg:p-12">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-4">
+                    <span className={`text-[10px] font-black px-5 py-2 rounded-full uppercase tracking-widest border ${
+                      notice.priority === "URGENT"
+                        ? "bg-red-50 text-red-600 border-red-100"
+                        : "bg-[#355E3B]/5 text-[#355E3B] border-[#355E3B]/10"
+                    }`}>
                       {notice.priority}
                     </span>
                     {notice.priority === "URGENT" && (
-                      <span className="flex items-center gap-1.5 text-red-600 text-[10px] font-black uppercase animate-pulse">
-                        <AlertCircle size={14} /> Critical
+                      <span className="flex items-center gap-2 text-red-600 text-[10px] font-black uppercase animate-pulse">
+                        <AlertCircle size={14} /> Critical Action Required
                       </span>
                     )}
                   </div>
-                  
-                  {/* Target Audience Badge */}
-                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-md uppercase">
+                  <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">
                     Ref: {notice.targetAudience}
                   </span>
                 </div>
 
-                <h3 className="text-[#355E3B] font-serif text-2xl lg:text-4xl font-extrabold leading-tight mb-4 group-hover:text-[#2a4a2e] transition-colors">
+                <h3 className="text-[#355E3B] font-serif text-2xl lg:text-2xl font-black leading-tight mb-8">
                   {notice.title}
                 </h3>
 
-                <p className="text-slate-600 text-sm lg:text-lg leading-relaxed mb-8 font-medium max-w-4xl">
-                  {notice.description}
-                </p>
+                {/* THE UPDATED DESCRIPTION CONTAINER */}
+                <div className="description-container mb-10 max-w-5xl">
+                  {renderFormattedDescription(notice.description)}
+                </div>
 
-                {/* META INFO & ACTIONS */}
-                <div className="flex flex-col lg:flex-row items-center justify-between gap-8 pt-8 border-t border-slate-100">
-                  <div className="flex flex-wrap justify-center lg:justify-start items-center gap-6 text-slate-400">
-                    <div className="flex items-center gap-2">
-                      <Calendar size={16} className="text-[#C5A059]" />
-                      <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                        {new Date(notice.createdAt).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </span>
+                {/* FOOTER ACTION AREA */}
+                <div className="flex flex-col lg:flex-row items-center justify-between gap-8 pt-10 border-t border-slate-100">
+                  <div className="flex flex-wrap items-center gap-8">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-slate-50 rounded-lg text-[#C5A059]"><Calendar size={16} /></div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Date Published</p>
+                        <p className="text-[11px] font-bold text-slate-600 uppercase">
+                          {new Date(notice.createdAt).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <User size={16} className="text-[#C5A059]" />
-                      <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                        {notice.createdBy?.name || "Registry System"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Eye size={16} />
-                      <span className="text-[11px] font-black uppercase tracking-widest">
-                        {notice.stats?.views ?? 0}
-                      </span>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-slate-50 rounded-lg text-[#C5A059]"><User size={16} /></div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Issuing Authority</p>
+                        <p className="text-[11px] font-bold text-slate-600 uppercase">
+                          {notice.createdBy?.name || "Registry System"}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
@@ -174,15 +200,16 @@ const JudgeNoticesPage = () => {
                     {notice.attachments && notice.attachments.length > 0 ? (
                       <button
                         onClick={() => dispatch(downloadNotice(notice._id))}
-                        className="w-full flex items-center justify-center gap-4 bg-[#355E3B] text-white px-10 py-5 rounded-2xl font-black text-[12px] uppercase tracking-[0.2em] shadow-xl shadow-[#355E3B]/20 hover:bg-[#2a4a2e] hover:-translate-y-1 active:scale-[0.98] transition-all"
+                        className="w-full group flex items-center justify-center gap-4 bg-[#355E3B] text-white px-10 py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-[#355E3B]/20 hover:bg-[#2a4a2e] transition-all"
                       >
-                        <Download size={20} strokeWidth={3} />
-                        Download File • {formatFileSize(notice.attachments[0]?.fileSize)}
+                        <Download size={18} strokeWidth={3} className="group-hover:translate-y-0.5 transition-transform" />
+                        Download PDF • {formatFileSize(notice.attachments[0]?.fileSize)}
                       </button>
                     ) : (
-                      <span className="text-[11px] font-black text-slate-300 uppercase italic tracking-widest">
-                        Document scan pending
-                      </span>
+                      <div className="flex items-center gap-2 px-6 py-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <AlertCircle size={14} className="text-slate-300" />
+                        <span className="text-[10px] font-black text-slate-400 uppercase italic">Scan Pending</span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -194,5 +221,12 @@ const JudgeNoticesPage = () => {
     </div>
   );
 };
+
+const LoaderIcon = () => (
+  <div className="flex flex-col items-center gap-4">
+    <div className="w-10 h-10 border-[3px] border-[#355E3B]/10 border-t-[#355E3B] rounded-full animate-spin" />
+    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Registry Synchronizing...</p>
+  </div>
+);
 
 export default JudgeNoticesPage;
