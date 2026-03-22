@@ -9,18 +9,18 @@ interface SyncEvent extends ExtendableEvent {
 
 declare global {
   interface ServiceWorkerGlobalScopeEventMap {
-    'sync': SyncEvent  // 👈 register 'sync' as a known event
+    'sync': SyncEvent
   }
 }
 
-import { clientsClaim } from 'workbox-core'
+import { clientsClaim, skipWaiting } from 'workbox-core' // 👈 added skipWaiting
 import { precacheAndRoute } from 'workbox-precaching'
 import { registerRoute } from 'workbox-routing'
 import { NetworkFirst } from 'workbox-strategies'
 import { replayPendingRequests } from './lib/syncManager'
 
-// Workbox — take control immediately
-clientsClaim()
+skipWaiting()  // 👈 skip waiting phase — activate immediately
+clientsClaim() // 👈 take control of all open tabs
 
 // Precache all assets injected by vite-plugin-pwa
 precacheAndRoute(self.__WB_MANIFEST)
