@@ -21,6 +21,26 @@ import CoverP from "../../assets/CoverP.png";
 import Back from "../../assets/Back.png";
 
 /* =====================================================
+    HELPERS
+===================================================== */
+/**
+ * Formats names to Title Case while preserving specific uppercase honors/titles.
+ */
+const formatName = (str: string) => {
+  if (!str) return "";
+  const honors = ["EBS", "OGW", "PHD", "SC", "SCJ", "CBS", "EGH", "FCI", "ARB"];
+  
+  return str
+    .split(" ")
+    .map((word) => {
+      const cleanWord = word.replace(/[^a-zA-Z]/g, "").toUpperCase();
+      if (honors.includes(cleanWord)) return word.toUpperCase();
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(" ");
+};
+
+/* =====================================================
     FLIPBOOK PAGE COMPONENT
 ===================================================== */
 const Page = React.forwardRef<HTMLDivElement, { number: number; children: React.ReactNode; isCover?: boolean }>((props, ref) => {
@@ -61,7 +81,7 @@ const BioModal: React.FC<{ isOpen: boolean; onClose: () => void; data: Judge | n
           <img src={data.imageUrl} className="absolute inset-0 w-full h-full object-cover object-top" alt={data.name} />
           <div className="absolute inset-0 bg-gradient-to-t from-[#1a2e1d] via-[#1a2e1d]/20 to-transparent opacity-90" />
           <div className="absolute bottom-0 left-0 w-full p-8">
-            <h3 className="font-serif font-bold text-2xl text-white">{data.name}</h3>
+            <h3 className="font-serif font-bold text-2xl text-white">{formatName(data.name)}</h3>
             <p className="text-[#C5A059] font-black text-[10px] uppercase tracking-widest">{data.title}</p>
           </div>
         </div>
@@ -135,7 +155,6 @@ const JudgesReligion = () => {
     return () => clearInterval(timer);
   }, [program?.scheduledRelease, program?.isLocked, dispatch]);
 
-  // Combined key for the flipbook container to force clean re-mounts
   const flipbookKey = useMemo(() => {
     return `fb-${activeTab}-${program?.schedule?.length || 0}-${program?.isLocked ? 'L' : 'U'}`;
   }, [activeTab, program]);
@@ -144,7 +163,6 @@ const JudgesReligion = () => {
     const pages: JSX.Element[] = [];
     let pageCounter = 1;
 
-    // 1. Cover Page
     pages.push(
       <Page key="cover" number={pageCounter++} isCover={true}>
         <div className="absolute inset-0 w-full h-full">
@@ -166,8 +184,8 @@ const JudgesReligion = () => {
         </Page>
       );
     } else {
-      const MAX_PAGE_WEIGHT = 950;
-      const MIN_ITEMS_PER_PAGE = 3;
+      const MAX_PAGE_WEIGHT = 900;
+      const MIN_ITEMS_PER_PAGE = 2;
 
       scheduleArray.forEach((day: any, dayIdx: number) => {
         let currentPageActivities: any[] = [];
@@ -175,7 +193,7 @@ const JudgesReligion = () => {
         const activities = day.activities || [];
 
         activities.forEach((act: any) => {
-          const itemWeight = (act.activity?.length || 0) + (act.facilitator?.length || 0) + 120;
+          const itemWeight = (act.activity?.length || 0) + (act.facilitator?.length || 0) + 150;
           if (currentWeight + itemWeight > MAX_PAGE_WEIGHT && currentPageActivities.length >= MIN_ITEMS_PER_PAGE) {
             pages.push(renderSchedulePage(day, currentPageActivities, pageCounter++, true, dayIdx));
             currentPageActivities = [];
@@ -192,7 +210,6 @@ const JudgesReligion = () => {
       });
     }
 
-    // 2. Ensure even number of pages so back cover is on the right
     if (pages.length % 2 !== 0) {
         pages.push(
           <Page key={`filler-${pageCounter}`} number={pageCounter++}>
@@ -201,7 +218,6 @@ const JudgesReligion = () => {
         );
     }
 
-    // 3. Back Page with Image
     pages.push(
       <Page key="back-cover" number={pageCounter++} isCover={true}>
         <div className="absolute inset-0 w-full h-full">
@@ -217,7 +233,7 @@ const JudgesReligion = () => {
     return (
       <Page key={`day-${dayIdx}-page-${pageNum}`} number={pageNum}>
         <div className="flex flex-col h-full">
-          <header className="border-b-2 border-[#355E3B]/20 pb-3 mb-6 shrink-0">
+          <header className="border-b-2 border-[#355E3B]/20 pb-3 mb-4 shrink-0">
             <h2 className="text-[#355E3B] font-serif text-base sm:text-lg font-bold uppercase tracking-tight">
               Day {day.day} {isContinuation && <span className="text-[#C5A059] ml-2 text-[10px] italic">(Cont.)</span>}
             </h2>
@@ -225,20 +241,45 @@ const JudgesReligion = () => {
               {day.date ? new Date(day.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
             </p>
           </header>
-          <div className="flex-1 flex flex-col space-y-6">
+
+          {!isContinuation && day.session_chairs && day.session_chairs.length > 0 && (
+            <div className="mb-6 bg-[#355E3B]/5 p-3 rounded-xl border border-[#355E3B]/10">
+              <h4 className="text-[9px] font-black text-[#355E3B] uppercase tracking-widest mb-2 opacity-70">Session Chairs</h4>
+              <ul className="space-y-1">
+                {day.session_chairs.map((chair: string, idx: number) => (
+                  <li key={idx} className="flex items-center gap-2 text-[10px] font-serif font-bold text-slate-700">
+                    <div className="w-1 h-1 bg-[#C5A059] rounded-full" />
+                    {formatName(chair)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex-1 flex flex-col space-y-5">
             {activities.map((act: any, i: number) => (
-              <div key={i} className="flex gap-5 border-b border-slate-100/60 pb-4 last:border-0 items-start">
-                <span className="text-[#355E3B] font-mono text-[10px] sm:text-[12px] font-bold shrink-0 mt-1 bg-slate-100/50 px-2 py-0.5 rounded">
+              <div key={i} className="flex gap-4 border-b border-slate-100/60 pb-4 last:border-0 items-start">
+                <span className="text-[#355E3B] font-mono text-[10px] sm:text-[11px] font-bold shrink-0 mt-1 bg-slate-100/50 px-2 py-0.5 rounded">
                   {act.time}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11px] sm:text-[13px] font-serif font-bold text-slate-900 leading-snug uppercase break-words tracking-tight">
+                  <p className="text-[11px] sm:text-[12px] font-serif font-bold text-slate-900 leading-snug break-words tracking-tight uppercase">
                     {act.activity}
                   </p>
+                  
                   {act.facilitator && (
-                    <p className="text-[9px] sm:text-[11px] text-[#355E3B] mt-1.5 italic font-medium leading-relaxed">
-                      {act.facilitator}
-                    </p>
+                    <ul className="mt-2.5 space-y-1.5">
+                      {act.facilitator.split(/\n|•/).map((name: string, idx: number) => {
+                        const trimmedName = name.trim();
+                        if (!trimmedName) return null;
+                        return (
+                          <li key={idx} className="flex items-start gap-2 text-[9px] sm:text-[10px] text-[#355E3B] italic font-medium leading-tight">
+                            <span className="mt-1.5 w-1 h-1 rounded-full bg-[#C5A059]/60 shrink-0" />
+                            <span>{formatName(trimmedName)}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
                   )}
                 </div>
               </div>
@@ -301,7 +342,6 @@ const JudgesReligion = () => {
                 </div>
               </div>
             ) : (
-              // Using a stable key on the wrapper prevents React from crashing during DOM manipulation
               <div key={flipbookKey} className="relative animate-in fade-in slide-in-from-bottom-4 duration-700">
                 {/* @ts-ignore */}
                 <HTMLFlipBook 
@@ -326,7 +366,7 @@ const JudgesReligion = () => {
                   <img src={judge.imageUrl} className="w-full h-full object-cover" alt={judge.name} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-[14px] font-serif font-bold text-[#355E3B] truncate">{judge.name}</h3>
+                  <h3 className="text-[14px] font-serif font-bold text-[#355E3B] truncate">{formatName(judge.name)}</h3>
                   <p className="text-[9px] font-black text-[#C5A059] uppercase mt-0.5">{judge.title}</p>
                 </div>
                 <ChevronRight size={16} className="text-slate-300 group-hover:text-[#355E3B]" />

@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom"; // 👈 added useNavigate
 import {
   User, Bell, BellOff, Search, Calendar, ChevronRight, Loader2, LogOut, Settings
 } from "lucide-react";
+import toast from "react-hot-toast"; // 👈 added
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { subscribeUserToPush } from "../../store/slices/pushSlice";
 import { logoutUser } from "../../store/slices/adminAuthSlice";
@@ -11,6 +12,7 @@ import { clearUnreadCount } from "../../store/slices/adminMessageSlice";
 const AdminHeader: React.FC = () => {
   const dispatch = useAppDispatch();
   const location = useLocation();
+  const navigate = useNavigate(); // 👈 added
   const dropdownRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +42,19 @@ const AdminHeader: React.FC = () => {
       if (!isNotifOpen) dispatch(clearUnreadCount());
     }
   };
+
+  // 👇 updated logout handler
+  const handleLogout = async () => {
+    setIsProfileOpen(false)
+    const toastId = toast.loading("Signing out...")
+    try {
+      await dispatch(logoutUser()).unwrap()
+      toast.success("Signed out successfully", { id: toastId })
+      navigate("/login", { replace: true }) // 👈 redirect after logout
+    } catch {
+      toast.error("Logout failed", { id: toastId })
+    }
+  }
 
   const getPageTitle = () => {
     const path = location.pathname.split("/").pop();
@@ -145,7 +160,10 @@ const AdminHeader: React.FC = () => {
                 <Settings size={14} /> Settings
               </button>
               <div className="h-px bg-slate-100 my-1" />
-              <button onClick={() => dispatch(logoutUser())} className="w-full flex items-center gap-3 px-3 py-2.5 text-[11px] font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+              <button
+                onClick={handleLogout} // 👈 updated
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-[11px] font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
                 <LogOut size={14} /> Sign Out
               </button>
             </div>
