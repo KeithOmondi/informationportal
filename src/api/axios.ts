@@ -1,5 +1,5 @@
 import axios, { type AxiosRequestConfig } from "axios";
-import { savePendingRequest } from "../lib/syncDB"; // 👈 added
+import { savePendingRequest } from "../lib/syncDB";
 
 interface FailedRequest {
   resolve: (value: any) => void;
@@ -28,7 +28,6 @@ const processQueue = (error: any = null) => {
   failedQueue = [];
 };
 
-// 👇 helper to register background sync
 const registerBackgroundSync = async () => {
   if ('serviceWorker' in navigator && 'SyncManager' in window) {
     const reg = await navigator.serviceWorker.ready
@@ -41,7 +40,7 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // 👇 No response = offline — save POST/PUT requests for background sync
+    // No response = offline
     if (!error.response) {
       const method = originalRequest.method?.toUpperCase()
       if (method === 'POST' || method === 'PUT') {
@@ -86,14 +85,26 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        await axios.post(`${import.meta.env.VITE_API_URL}/auth/refresh`, {}, { withCredentials: true });
+        await axios.post(
+          `${import.meta.env.VITE_API_URL}/auth/refresh`,
+          {},
+          { withCredentials: true }
+        );
         isRefreshing = false;
         processQueue(null);
         return api.request(originalRequest);
       } catch (refreshErr: any) {
         isRefreshing = false;
         processQueue(refreshErr);
-        logoutHandler();
+
+        // 👇 check if kicked by another device during interceptor refresh too
+        const msg = refreshErr?.response?.data?.message || ""
+        if (msg.toLowerCase().includes("another device")) {
+          logoutHandler("Security Alert: Account accessed from another device.")
+        } else {
+          logoutHandler()
+        }
+
         return Promise.reject(refreshErr);
       }
     }
