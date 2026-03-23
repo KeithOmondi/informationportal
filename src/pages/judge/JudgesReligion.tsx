@@ -61,15 +61,13 @@ const getMimeLabel = (mimeType: string): string => {
 };
 
 /* =====================================================
-    PRESENTATION CARD (Updated Cloudinary Fix)
+    PRESENTATION CARD
 ===================================================== */
 const PresentationCard: React.FC<{ pres: Presentation }> = ({ pres }) => {
   const isVideo = pres.fileType === "video";
 
   const getDownloadUrl = (url: string) => {
     if (!url || !url.includes("cloudinary.com")) return url;
-    // Fix: Insert fl_attachment without custom text that creates 404s
-    // This forces download using the file's native Cloudinary name safely
     return url.replace("/upload/", "/upload/fl_attachment/");
   };
 
@@ -158,7 +156,6 @@ const JudgesReligion = () => {
     }
   }, [dispatch]);
 
-  // Stable Key logic: prevents re-mount (flicker) when data is refreshing
   const flipbookKey = useMemo(() => {
     if (!program?.schedule) return "loading";
     return `fb-${program.schedule.length}-${program.isLocked ? "L" : "U"}`;
@@ -176,14 +173,19 @@ const JudgesReligion = () => {
 
     const scheduleArray = program?.schedule || [];
     if (scheduleArray.length > 0) {
-      const MAX_PAGE_WEIGHT = 1600;
+      // Reduced weight limit slightly to account for Session Chair text lines
+      const MAX_PAGE_WEIGHT = 1500; 
       scheduleArray.forEach((day: any, dayIdx: number) => {
         let currentPageActivities: any[] = [];
         let currentWeight = 0;
         const activities = day.activities || [];
 
         activities.forEach((act: any) => {
-          const itemWeight = (act.activity?.length || 0) + (act.facilitator?.length || 0) + 250;
+          // Weight calculation includes session_chair now
+          const itemWeight = (act.activity?.length || 0) + 
+                             (act.facilitator?.length || 0) + 
+                             (act.session_chair?.length || 0) + 280;
+
           if (currentWeight + itemWeight > MAX_PAGE_WEIGHT && currentPageActivities.length > 0) {
             pages.push(renderSchedulePage(day, currentPageActivities, pageCounter++, true, dayIdx));
             currentPageActivities = [];
@@ -226,7 +228,19 @@ const JudgesReligion = () => {
                 <span className="text-[#355E3B] font-mono text-[10px] font-bold shrink-0 mt-1 bg-slate-100/50 px-2 py-0.5 rounded">{act.time}</span>
                 <div className="flex-1">
                   <p className="text-[11px] font-serif font-bold text-slate-900 leading-tight uppercase">{act.activity}</p>
+                  
+                  {/* Facilitator Display */}
                   {act.facilitator && <p className="text-[9px] text-[#355E3B] italic mt-1">{formatName(act.facilitator)}</p>}
+                  
+                  {/* SESSION CHAIR UPDATE */}
+                  {act.session_chair && (
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <div className="h-px w-3 bg-[#C5A059]/40" />
+                      <p className="text-[8px] font-black text-[#C5A059] uppercase tracking-wider">
+                        Chair: {formatName(act.session_chair)}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -282,7 +296,6 @@ const JudgesReligion = () => {
           </div>
         )}
 
-        {/* BIO and PRESENTATION tabs remain the same as your updated version */}
         {activeTab === "BIO" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {judges.map((judge) => (
