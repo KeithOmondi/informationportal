@@ -4,7 +4,7 @@ import {
   type ActionReducerMapBuilder,
 } from "@reduxjs/toolkit";
 import { api } from "../../api/axios";
-import axios from "axios"; // 👈 added
+import axios from "axios";
 
 /* ===========================
     TYPES
@@ -21,6 +21,7 @@ export interface User {
 
 interface AuthState {
   user: User | null;
+  accessToken: string | null; // 👈 added
   loading: boolean;
   error: string | null;
   isInitialized: boolean;
@@ -28,6 +29,7 @@ interface AuthState {
 
 const initialState: AuthState = {
   user: null,
+  accessToken: null, // 👈 added
   loading: false,
   error: null,
   isInitialized: false,
@@ -43,7 +45,8 @@ export const loginUser = createAsyncThunk(
   async ({ pj }: { pj: string }, { rejectWithValue }) => {
     try {
       const res = await api.post("/auth/login", { pj }, { withCredentials: true });
-      return res.data.user as User;
+      // 👇 return both user and accessToken
+      return { user: res.data.user as User, accessToken: res.data.accessToken as string }
     } catch (err: any) {
       const message = err.response?.data?.message || "Invalid credentials.";
       return rejectWithValue({ message });
@@ -56,13 +59,13 @@ export const refreshUser = createAsyncThunk(
   "auth/refreshUser",
   async (_, { rejectWithValue }) => {
     try {
-      // 👇 plain axios bypasses interceptor — avoids infinite loop on Safari
       const res = await axios.post(
         `${import.meta.env.VITE_API_URL}/auth/refresh`,
         {},
         { withCredentials: true }
       );
-      return res.data.user as User;
+      // 👇 return both user and accessToken
+      return { user: res.data.user as User, accessToken: res.data.accessToken as string }
     } catch (err: any) {
       const message = err.response?.data?.message || "NO_SESSION";
       return rejectWithValue(message);
@@ -95,8 +98,9 @@ const authSlice = createSlice({
     },
     clearUser: (state) => {
       state.user = null;
+      state.accessToken = null; // 👈 added
       state.loading = false;
-      state.isInitialized = true; // 👈 fixed: was "isInitialized: true" (typo)
+      state.isInitialized = true;
     },
     resetAuthFlags: (state) => {
       state.error = null;
@@ -112,7 +116,8 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload;
+        state.user = action.payload.user       // 👈 updated
+        state.accessToken = action.payload.accessToken // 👈 added
         state.error = null;
         state.isInitialized = true;
       })
@@ -128,12 +133,14 @@ const authSlice = createSlice({
       })
       .addCase(refreshUser.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload;
+        state.user = action.payload.user       // 👈 updated
+        state.accessToken = action.payload.accessToken // 👈 added
         state.isInitialized = true;
       })
       .addCase(refreshUser.rejected, (state, action) => {
         state.loading = false;
         state.user = null;
+        state.accessToken = null; // 👈 added
         state.isInitialized = true;
         const msg = action.payload as string;
         if (msg && msg !== "NO_SESSION") {
@@ -144,6 +151,7 @@ const authSlice = createSlice({
       /* ---------- LOGOUT ---------- */
       .addCase(logoutUser.fulfilled, (state) => {
         state.user = null;
+        state.accessToken = null; // 👈 added
         state.loading = false;
         state.error = null;
         state.isInitialized = true;

@@ -1,5 +1,6 @@
 import axios, { type AxiosRequestConfig } from "axios";
 import { savePendingRequest } from "../lib/syncDB";
+import { getStore } from "../store/storeAccessor"; // 👈 replaces direct store import
 
 interface FailedRequest {
   resolve: (value: any) => void;
@@ -34,6 +35,15 @@ const registerBackgroundSync = async () => {
     await reg.sync.register('sync-pending-requests')
   }
 }
+
+// 👇 attach accessToken as Authorization header on every request
+api.interceptors.request.use((config) => {
+  const token = getStore()?.getState().auth.accessToken // 👈 lazy accessor
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
 
 api.interceptors.response.use(
   (response) => response,
@@ -85,11 +95,21 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        await axios.post(
+        const refreshRes = await axios.post(
           `${import.meta.env.VITE_API_URL}/auth/refresh`,
           {},
           { withCredentials: true }
         );
+
+        const newToken = refreshRes.data.accessToken
+        if (newToken) {
+          getStore()?.dispatch({  // 👈 lazy accessor
+            type: 'auth/setAccessToken',
+            payload: newToken
+          })
+          originalRequest.headers.Authorization = `Bearer ${newToken}`
+        }
+
         isRefreshing = false;
         processQueue(null);
         return api.request(originalRequest);
@@ -97,7 +117,6 @@ api.interceptors.response.use(
         isRefreshing = false;
         processQueue(refreshErr);
 
-        // 👇 check if kicked by another device during interceptor refresh too
         const msg = refreshErr?.response?.data?.message || ""
         if (msg.toLowerCase().includes("another device")) {
           logoutHandler("Security Alert: Account accessed from another device.")
