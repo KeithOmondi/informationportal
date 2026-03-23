@@ -207,19 +207,18 @@ const JudgeDashboardPage = () => {
             />
           </Link>
 
-          {/* DYNAMIC PROGRAMME CARD */}
+          {/* HARDCODED ACTIVE PROGRAMME CARD */}
           <Link 
-            to={program?.isLocked ? "#" : "/judge/documents"}
-            className={program?.isLocked ? "cursor-not-allowed" : "cursor-pointer"}
-            onClick={(e) => program?.isLocked && e.preventDefault()}
+            to="/judge/documents"
+            className="cursor-pointer"
           >
             <StatCard
               title="Programme"
-              value={program?.isLocked ? "LOCKED" : "ACTIVE"}
-              subtext={program?.isLocked ? "Awaiting Release" : "Schedule Ready"}
+              value="ACTIVE"
+              subtext="Schedule Ready"
               loading={ceremonyLoading && !program}
-              urgent={!program?.isLocked}
-              locked={program?.isLocked}
+              urgent={true} // Forces the Green/Gold judicial theme
+              locked={false} // Forces it to stay unlocked
             />
           </Link>
         </div>
