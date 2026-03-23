@@ -6,6 +6,8 @@ export interface Presentation {
   title: string;
   description?: string;
   fileUrl: string;
+  downloadUrl: string;   // ← added
+  publicId: string;
   fileType: "image" | "video" | "raw";
   mimeType: string;
   fileName: string;
@@ -16,6 +18,8 @@ export interface Presentation {
 interface PresentationState {
   items: Presentation[];
   loading: boolean;
+  uploading: boolean; 
+  deleting: string | null; 
   success: boolean;
   error: string | null;
 }
@@ -23,6 +27,8 @@ interface PresentationState {
 const initialState: PresentationState = {
   items: [],
   loading: false,
+  uploading: false,
+  deleting: null,
   success: false,
   error: null,
 };
@@ -33,10 +39,13 @@ export const fetchPresentations = createAsyncThunk(
   "presentations/fetchAll",
   async (_, thunkAPI) => {
     try {
+      // Ensure this matches your backend prefix (e.g., /api/v1/presentations)
       const response = await api.get("/presentations");
       return response.data;
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to load materials");
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Failed to load presentations"
+      );
     }
   }
 );
@@ -45,12 +54,17 @@ export const uploadPresentation = createAsyncThunk(
   "presentations/upload",
   async (formData: FormData, thunkAPI) => {
     try {
+      // NOTE: Using /upload to match your controller route
       const response = await api.post("/presentations/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        // Important for large files to prevent client-side timeout before server 500
+        timeout: 60000, 
       });
       return response.data;
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response?.data?.message || "Upload failed");
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Upload failed. File might be too large."
+      );
     }
   }
 );
@@ -62,7 +76,9 @@ export const deletePresentation = createAsyncThunk(
       await api.delete(`/presentations/${id}`);
       return id;
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response?.data?.message || "Deletion failed");
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Deletion failed"
+      );
     }
   }
 );
@@ -83,33 +99,58 @@ const presentationSlice = createSlice({
       // Fetch
       .addCase(fetchPresentations.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
-      .addCase(fetchPresentations.fulfilled, (state, action: PayloadAction<Presentation[]>) => {
+      .addCase(
+        fetchPresentations.fulfilled,
+        (state, action: PayloadAction<Presentation[]>) => {
+          state.loading = false;
+          state.items = action.payload;
+        }
+      )
+      .addCase(fetchPresentations.rejected, (state, action) => {
         state.loading = false;
-        state.items = action.payload;
+        state.error = action.payload as string;
       })
+
       // Upload
       .addCase(uploadPresentation.pending, (state) => {
-        state.loading = true;
+        state.uploading = true;
+        state.success = false;
+        state.error = null;
+      })
+      .addCase(
+        uploadPresentation.fulfilled,
+        (state, action: PayloadAction<Presentation>) => {
+          state.uploading = false;
+          state.success = true;
+          state.items.unshift(action.payload);
+        }
+      )
+      .addCase(uploadPresentation.rejected, (state, action) => {
+        state.uploading = false;
+        state.error = action.payload as string;
         state.success = false;
       })
-      .addCase(uploadPresentation.fulfilled, (state, action: PayloadAction<Presentation>) => {
-        state.loading = false;
-        state.success = true;
-        state.items.unshift(action.payload); // Add new item to the top
-      })
+
       // Delete
-      .addCase(deletePresentation.fulfilled, (state, action: PayloadAction<string>) => {
-        state.items = state.items.filter((item) => item._id !== action.payload);
+      .addCase(deletePresentation.pending, (state, action) => {
+        state.deleting = action.meta.arg;
+        state.error = null;
       })
-      // Generic Error Handler
-      .addMatcher(
-        (action) => action.type.endsWith("/rejected"),
-        (state, action: any) => {
-          state.loading = false;
-          state.error = action.payload;
+      .addCase(
+        deletePresentation.fulfilled,
+        (state, action: PayloadAction<string>) => {
+          state.deleting = null;
+          state.items = state.items.filter(
+            (item) => item._id !== action.payload
+          );
         }
-      );
+      )
+      .addCase(deletePresentation.rejected, (state, action) => {
+        state.deleting = null;
+        state.error = action.payload as string;
+      });
   },
 });
 
