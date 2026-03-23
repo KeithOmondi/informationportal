@@ -206,10 +206,7 @@ const JudgeGallery = () => {
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <User size={16} className="text-[#EFBF04]" />
-                      <div>
-                        <p className="text-[9px] font-black text-white/30 uppercase">Uploader</p>
-                        <p className="text-sm font-bold text-white">{selectedMedia.uploadedBy?.name || "System"}</p>
-                      </div>
+                      
                     </div>
                     <div className="flex items-center gap-3">
                       <Calendar size={16} className="text-[#EFBF04]" />
