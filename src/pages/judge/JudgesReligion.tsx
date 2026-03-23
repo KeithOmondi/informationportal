@@ -22,10 +22,8 @@ import Back from "../../assets/Back.png";
 const formatName = (str: string) => {
   if (!str) return "";
 
-  // 1. Define specific honorifics that must be ALL CAPS
   const upperHonors = ["EBS", "OGW", "PHD", "SC", "SCJ", "CBS", "EGH", "FCI", "ARB"];
   
-  // 2. Define specific honorifics that need Mixed Case or specific handling
   const mixedHonors: Record<string, string> = {
     "DR": "Dr.",
     "DR.": "Dr.",
@@ -36,22 +34,12 @@ const formatName = (str: string) => {
   };
 
   return str.split(" ").map((word) => {
-      // Remove parentheses and punctuation to check the core word (e.g., "(rtd.)" -> "RTD")
       const cleanWord = word.toUpperCase().replace(/[^A-Z.]/g, "").replace(/\.$/, "");
-      
-      // Handle All-Caps honors
       if (upperHonors.includes(cleanWord)) return word.toUpperCase();
-      
-      // Handle Mixed-Case honors specifically (fixing the "rtd" issue)
       if (mixedHonors[cleanWord] || cleanWord === "RTD") {
-        // Use regex to find 'rtd' case-insensitively and replace with 'Rtd'
-        // This preserves surrounding brackets or dots: "(rtd.)" -> "(Rtd.)"
         return word.replace(/rtd/i, "Rtd");
       }
-      
       if (cleanWord === "DR") return "Dr.";
-      
-      // Default: Sentence Case for standard names
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     }).join(" ");
 };
@@ -174,9 +162,10 @@ const JudgesReligion = () => {
         const activities = day.activities || [];
 
         activities.forEach((act: any) => {
-          const actText = Array.isArray(act.activity) ? act.activity.join(" ") : (act.activity || "");
-          const facText = Array.isArray(act.facilitator) ? act.facilitator.join(" ") : (act.facilitator || "");
-          const itemWeight = actText.length + facText.length + 250;
+          const actText = act.activity || "";
+          const facText = act.facilitator || "";
+          const chairText = act.session_chair || "";
+          const itemWeight = actText.length + facText.length + chairText.length + 250;
 
           if (currentWeight + itemWeight > MAX_PAGE_WEIGHT && currentPageActivities.length >= MIN_ITEMS_PER_PAGE) {
             pages.push(renderSchedulePage(day, currentPageActivities, pageCounter++, true, dayIdx));
@@ -217,6 +206,17 @@ const JudgesReligion = () => {
             <p className="text-[#C5A059] text-[9px] font-black uppercase tracking-[0.2em]">
               {day.date ? new Date(day.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
             </p>
+            {/* INCLUDED: Day-level Session Chairs */}
+            {day.session_chairs && day.session_chairs.length > 0 && !isContinuation && (
+              <div className="mt-2 flex flex-wrap gap-x-2">
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Session Chairs:</span>
+                {day.session_chairs.map((chair: string, idx: number) => (
+                  <span key={idx} className="text-[9px] font-bold text-[#355E3B] uppercase">
+                    {formatName(chair)}{idx < day.session_chairs.length - 1 ? ',' : ''}
+                  </span>
+                ))}
+              </div>
+            )}
           </header>
 
           <div className="flex-1 flex flex-col space-y-4">
@@ -226,42 +226,31 @@ const JudgesReligion = () => {
                   {act.time}
                 </span>
                 <div className="flex-1 min-w-0">
-                  {Array.isArray(act.activity) ? (
-                    <div className="space-y-4">
-                      {act.activity.map((subAct: string, idx: number) => (
-                        <div key={idx}>
-                          <p className="text-[11px] font-serif font-bold text-slate-900 leading-tight uppercase tracking-tight">
-                            {subAct}
-                          </p>
-                          {act.facilitator[idx]?.split('\n').map((fname: string, fidx: number) => (
-                            <p key={fidx} className="text-[9px] text-[#355E3B] italic font-medium mt-0.5">
-                              {formatName(fname)}
-                            </p>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-[11px] font-serif font-bold text-slate-900 leading-tight uppercase tracking-tight">
-                        {act.activity}
-                      </p>
-                      {act.facilitator && (
-                        <ul className="mt-1.5 space-y-1">
-                          {act.facilitator.split(/\n|•/).map((name: string, idx: number) => {
-                             const trimmed = name.trim();
-                             if(!trimmed) return null;
-                             return (
-                                <li key={idx} className="flex items-start gap-2 text-[9px] text-[#355E3B] italic font-medium">
-                                  <span className="mt-1.5 w-1 h-1 rounded-full bg-[#C5A059]/60 shrink-0" />
-                                  <span>{formatName(trimmed)}</span>
-                                </li>
-                             )
-                          })}
-                        </ul>
-                      )}
-                    </>
-                  )}
+                    {/* INCLUDED: Activity-level Session Chair */}
+                    {act.session_chair && (
+                       <p className="text-[8px] font-black text-[#355E3B] uppercase tracking-widest mb-1">
+                         Session Chair: {formatName(act.session_chair)}
+                       </p>
+                    )}
+                    
+                    <p className="text-[11px] font-serif font-bold text-slate-900 leading-tight uppercase tracking-tight">
+                      {act.activity}
+                    </p>
+
+                    {act.facilitator && (
+                      <ul className="mt-1.5 space-y-1">
+                        {act.facilitator.split(/\n|•/).map((name: string, idx: number) => {
+                           const trimmed = name.trim();
+                           if(!trimmed) return null;
+                           return (
+                              <li key={idx} className="flex items-start gap-2 text-[9px] text-[#355E3B] italic font-medium">
+                                <span className="mt-1.5 w-1 h-1 rounded-full bg-[#C5A059]/60 shrink-0" />
+                                <span>{formatName(trimmed)}</span>
+                              </li>
+                           )
+                        })}
+                      </ul>
+                    )}
                 </div>
               </div>
             ))}
@@ -279,7 +268,15 @@ const JudgesReligion = () => {
             <div className="w-1.5 h-10 bg-[#355E3B] rounded-full" />
             <div>
               <p className="text-[#C5A059] text-[9px] font-black uppercase tracking-[0.3em]">Republic of Kenya</p>
-              <h1 className="text-[#355E3B] font-serif text-xl sm:text-2xl font-bold uppercase tracking-tight">Office of the Registrar High Court</h1>
+              <h1 className="text-[#355E3B] font-serif text-xl sm:text-2xl font-bold uppercase tracking-tight">
+                {program?.event_title || "Office of the Registrar High Court"}
+              </h1>
+              {/* INCLUDED: Conference Theme */}
+              {program?.theme && (
+                <p className="text-slate-500 text-[10px] font-medium leading-tight max-w-2xl mt-1 italic">
+                  Theme: {program.theme}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full sm:w-fit shadow-inner overflow-x-auto no-scrollbar">
@@ -300,7 +297,7 @@ const JudgesReligion = () => {
         {activeTab === "PROGRAM" && (
           <div key="program-container" className="max-w-5xl mx-auto flex flex-col items-center">
             {isInitialLoading && !program ? (
-               <div className="flex flex-col items-center justify-center py-20"><Loader2 className="animate-spin text-[#355E3B]" size={32} /></div>
+                <div className="flex flex-col items-center justify-center py-20"><Loader2 className="animate-spin text-[#355E3B]" size={32} /></div>
             ) : (
               <div key={flipbookKey} className="relative animate-in fade-in slide-in-from-bottom-4 duration-700">
                 {/* @ts-ignore */}

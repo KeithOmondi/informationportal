@@ -8,19 +8,23 @@ export interface Activity {
   time: string;
   activity: string;
   facilitator?: string;
+  // Included to capture specific chairs for session blocks (e.g., Mr. Duncan Okello)
+  session_chair?: string; 
 }
 
 export interface DaySchedule {
   _id?: string;
-  day: string;
+  day: string; // e.g., "ONE", "TWO"
   date: string | Date;
-  session_chairs?: string[];
+  session_chairs?: string[]; // General day chairs
   activities: Activity[];
 }
 
 export interface ProgramData {
   _id: string;
   event_title: string;
+  // Included to display the official conference focus
+  theme?: string; 
   schedule: DaySchedule[];
   programFileUrl?: string;
   isLocked: boolean;
@@ -140,15 +144,13 @@ const programSlice = createSlice({
         state.program = null;
       })
 
-      // Pending Matcher - Cleaned to prevent flickering
+      // Pending Matcher
       .addMatcher(
         (action): action is AnyAction => action.type.endsWith("/pending"),
         (state) => {
           state.loading = true;
           state.error = null;
           state.success = false;
-          // Note: We no longer nullify state.program here. 
-          // This allows the UI to show existing data while the new data loads.
         }
       )
       // Rejected Matcher
