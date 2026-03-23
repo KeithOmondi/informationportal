@@ -8,7 +8,6 @@ import {
   Search, 
   ShieldCheck,
   Calendar,
-  User,
   Download,
   AlertCircle,
   Image as ImageIcon,
@@ -30,7 +29,6 @@ const JudgeGallery = () => {
   useEffect(() => {
     dispatch(fetchGallery());
 
-    // Poll for new evidence every 30 seconds (conservative polling)
     const pollInterval = setInterval(() => {
       dispatch(fetchGallery());
     }, 30000); 
@@ -44,15 +42,11 @@ const JudgeGallery = () => {
     };
   }, [dispatch]);
 
-  // Combined Filtering Logic
+  // Updated Filtering Logic: Removed uploadedBy.name search
   const filteredItems = useMemo(() => {
     return items.filter(item => {
-      const matchesSearch = 
-        (item.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.uploadedBy?.name || "").toLowerCase().includes(searchTerm.toLowerCase());
-      
+      const matchesSearch = (item.description || "").toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = activeFilter === "all" || item.resourceType === activeFilter;
-
       return matchesSearch && matchesType;
     });
   }, [items, searchTerm, activeFilter]);
@@ -74,7 +68,6 @@ const JudgeGallery = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-            {/* TYPE SELECTOR */}
             <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
               {(["all", "image", "video"] as const).map((type) => (
                 <button
@@ -98,7 +91,7 @@ const JudgeGallery = () => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" size={18} />
               <input 
                 type="text"
-                placeholder="Search description or officer..."
+                placeholder="Search description..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-sm text-white placeholder:text-white/20 outline-none focus:ring-2 focus:ring-[#EFBF04]/50 transition-all"
@@ -143,8 +136,8 @@ const JudgeGallery = () => {
                     
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                     <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0">
-                       <p className="text-white text-[10px] font-bold uppercase tracking-widest truncate">View Details</p>
-                       <Maximize2 size={16} className="text-[#EFBF04]" />
+                        <p className="text-white text-[10px] font-bold uppercase tracking-widest truncate">View Details</p>
+                        <Maximize2 size={16} className="text-[#EFBF04]" />
                     </div>
                   </div>
                   <div className="p-4">
@@ -165,9 +158,9 @@ const JudgeGallery = () => {
         </div>
       </main>
 
-      {/* LIGHTBOX MODAL */}
+      {/* LIGHTBOX MODAL - z-index set to 9999 to clear sidebar */}
       {selectedMedia && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8">
           <div className="absolute inset-0 bg-[#0F172A]/95 backdrop-blur-md" onClick={() => setSelectedMedia(null)} />
           
           <div className="relative w-full max-w-6xl h-full max-h-[85vh] bg-[#1E293B] rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col lg:flex-row">
@@ -204,13 +197,7 @@ const JudgeGallery = () => {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <User size={16} className="text-[#EFBF04]" />
-                      <div>
-                        <p className="text-[9px] font-black text-white/30 uppercase">Uploader</p>
-                        <p className="text-sm font-bold text-white">{selectedMedia.uploadedBy?.name || "System"}</p>
-                      </div>
-                    </div>
+                    {/* Removed Uploader/User Section */}
                     <div className="flex items-center gap-3">
                       <Calendar size={16} className="text-[#EFBF04]" />
                       <div>
@@ -224,7 +211,7 @@ const JudgeGallery = () => {
 
               <div className="mt-8 pt-6 border-t border-white/5">
                 <button className="w-full flex items-center justify-center gap-2 bg-[#EFBF04] hover:bg-[#fcd34d] text-[#1A2F1F] font-black text-xs py-4 rounded-xl transition-all active:scale-95 shadow-lg">
-                  <Download size={16} /> DOWNLOAD ASSET
+                  <Download size={16} /> DOWNLOAD
                 </button>
               </div>
             </div>
