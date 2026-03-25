@@ -1,11 +1,11 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
 import { api } from "../../api/axios";
 
-// Types - Updated to match the simplified Mongoose schema
 export interface IGallery {
   _id: string;
   description: string;
   url: string;
+  downloadUrl: string;        // ← added
   resourceType: "image" | "video";
   uploadedBy?: {
     _id: string;

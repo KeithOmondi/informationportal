@@ -231,7 +231,7 @@ const JudgeDashboardPage = () => {
               <div className="flex items-center gap-3">
                 {isOngoing ? <Activity className="text-red-600 animate-pulse" size={22} /> : <Calendar className="text-[#C5A059]" size={22} />}
                 <h2 className="text-[#355E3B] font-serif text-2xl font-black">
-                  {isOngoing ? "Ongoing Assignment" : "Upcoming Event"}
+                  {isOngoing ? "Ongoing Event" : "Upcoming Event"}
                 </h2>
               </div>
             </div>
