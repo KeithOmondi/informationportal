@@ -29,6 +29,8 @@ const StatCard = ({
   loading,
   urgent = false,
   locked = false,
+  showBadge = false,
+  badgeText = "",
 }: {
   title: string;
   value: string | number;
@@ -36,8 +38,21 @@ const StatCard = ({
   loading?: boolean;
   urgent?: boolean;
   locked?: boolean;
+  showBadge?: boolean;
+  badgeText?: string;
 }) => (
   <div className={`bg-white border-l-4 ${locked ? 'border-l-slate-300' : urgent ? 'border-l-[#C5A059]' : 'border-l-[#355E3B]'} border border-slate-200 p-6 rounded-sm relative overflow-hidden group transition-all duration-300 shadow-sm hover:shadow-md h-full`}>
+    {showBadge && (
+      <div className="absolute top-0 right-0">
+        <div className="bg-[#C5A059] text-white text-[8px] font-black px-2 py-1 flex items-center gap-1 animate-pulse shadow-sm">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+          </span>
+          {badgeText}
+        </div>
+      </div>
+    )}
     <p className="text-slate-500 text-[10px] uppercase font-bold tracking-[0.15em] mb-4 flex justify-between items-center">
       {title}
       {locked ? <Lock size={10} className="text-slate-400" /> : !locked && title === "Programme" ? <Unlock size={10} className="text-[#C5A059]" /> : null}
@@ -46,7 +61,6 @@ const StatCard = ({
       {loading ? (
         <Loader2 className="animate-spin text-[#355E3B]" size={24} />
       ) : (
-        /* Reduced from 5xl to 3xl to prevent overlap for text values like 'LOCKED' */
         <h3 className={`text-[#355E3B] text-3xl font-serif font-black transition-colors duration-300 ${locked ? 'text-slate-300' : urgent ? 'text-[#C5A059]' : ''}`}>
           {value}
         </h3>
@@ -94,6 +108,13 @@ const JudgeDashboardPage = () => {
       day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
     });
   }, [user?.lastLogin]);
+
+  // Check for events added within the last 48 hours
+  const hasNewEvent = useMemo(() => {
+    if (!events || events.length === 0) return false;
+    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    return events.some(e => new Date(e.createdAt) > fortyEightHoursAgo);
+  }, [events]);
 
   const activeNotices = useMemo(() => {
     const now = new Date();
@@ -202,23 +223,21 @@ const JudgeDashboardPage = () => {
             <StatCard
               title="Events"
               value={events.length}
-              subtext="Judiciary Calendar"
+              subtext="High Court Calendar"
               loading={eventsLoading && events.length === 0}
+              showBadge={hasNewEvent}
+              badgeText="NEW EVENT"
             />
           </Link>
 
-          {/* HARDCODED ACTIVE PROGRAMME CARD */}
-          <Link 
-            to="/judge/documents"
-            className="cursor-pointer"
-          >
+          <Link to="/judge/documents">
             <StatCard
               title="Programme"
               value="ACTIVE"
-              subtext="Schedule Ready"
+              subtext="High Court Programme"
               loading={ceremonyLoading && !program}
-              urgent={true} // Forces the Green/Gold judicial theme
-              locked={false} // Forces it to stay unlocked
+              urgent={true}
+              locked={false}
             />
           </Link>
         </div>
@@ -234,6 +253,18 @@ const JudgeDashboardPage = () => {
                   {isOngoing ? "Ongoing Event" : "Upcoming Event"}
                 </h2>
               </div>
+
+              {/* FLOATING ACTION FOR NEW EVENTS */}
+              {hasNewEvent && (
+                <Link to="/judge/events" className="hidden sm:flex items-center gap-2 bg-[#355E3B] text-[#C5A059] px-3 py-1.5 rounded-sm border border-[#C5A059]/30 hover:bg-[#2a4b2f] transition-all group">
+                   <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#C5A059] opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C5A059]"></span>
+                  </span>
+                  <span className="text-[10px] font-black uppercase tracking-widest">New Event Added</span>
+                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                </Link>
+              )}
             </div>
 
             {displayEvent && startDate && endDate ? (
