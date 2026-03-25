@@ -2,6 +2,7 @@ import {
   createSlice,
   createAsyncThunk,
   type ActionReducerMapBuilder,
+  type PayloadAction,
 } from "@reduxjs/toolkit";
 import { api } from "../../api/axios";
 import axios from "axios";
@@ -19,9 +20,14 @@ export interface User {
   lastLogin?: string; 
 }
 
+interface AuthResponse {
+  user: User;
+  accessToken: string;
+}
+
 interface AuthState {
   user: User | null;
-  accessToken: string | null; // 👈 added
+  accessToken: string | null;
   loading: boolean;
   error: string | null;
   isInitialized: boolean;
@@ -29,7 +35,7 @@ interface AuthState {
 
 const initialState: AuthState = {
   user: null,
-  accessToken: null, // 👈 added
+  accessToken: null,
   loading: false,
   error: null,
   isInitialized: false,
@@ -39,48 +45,45 @@ const initialState: AuthState = {
     ASYNC THUNKS
 =========================== */
 
-/* ---------- LOGIN ---------- */
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
   async ({ pj }: { pj: string }, { rejectWithValue }) => {
     try {
       const res = await api.post("/auth/login", { pj }, { withCredentials: true });
-      // 👇 return both user and accessToken
-      return { user: res.data.user as User, accessToken: res.data.accessToken as string }
+      return res.data as AuthResponse;
     } catch (err: any) {
-      const message = err.response?.data?.message || "Invalid credentials.";
-      return rejectWithValue({ message });
+      return rejectWithValue(err.response?.data?.message || "Invalid credentials.");
     }
   }
 );
 
-/* ---------- SESSION REFRESH ---------- */
 export const refreshUser = createAsyncThunk(
   "auth/refreshUser",
   async (_, { rejectWithValue }) => {
     try {
+      // Use standard axios for refresh to avoid interceptor loops
       const res = await axios.post(
         `${import.meta.env.VITE_API_URL}/auth/refresh`,
         {},
         { withCredentials: true }
       );
-      // 👇 return both user and accessToken
-      return { user: res.data.user as User, accessToken: res.data.accessToken as string }
+      return res.data as AuthResponse;
     } catch (err: any) {
-      const message = err.response?.data?.message || "NO_SESSION";
-      return rejectWithValue(message);
+      // "NO_SESSION" is a silent error handled in the extraReducers
+      return rejectWithValue(err.response?.data?.message || "NO_SESSION");
     }
   }
 );
 
-/* ---------- LOGOUT ---------- */
 export const logoutUser = createAsyncThunk(
   "auth/logoutUser",
   async (_, { rejectWithValue }) => {
     try {
       await api.post("/auth/logout", {}, { withCredentials: true });
+      return true;
     } catch (err: any) {
-      return rejectWithValue("Logout failed.");
+      // We still return true/success to the reducer to ensure local wipe
+      return rejectWithValue("Server logout failed, local session cleared.");
     }
   }
 );
@@ -96,14 +99,12 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    // Force a local wipe (used for 401 interceptors)
     clearUser: (state) => {
       state.user = null;
-      state.accessToken = null; // 👈 added
+      state.accessToken = null;
       state.loading = false;
       state.isInitialized = true;
-    },
-    resetAuthFlags: (state) => {
-      state.error = null;
     },
   },
 
@@ -114,16 +115,15 @@ const authSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(loginUser.fulfilled, (state, action) => {
+      .addCase(loginUser.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
         state.loading = false;
-        state.user = action.payload.user       // 👈 updated
-        state.accessToken = action.payload.accessToken // 👈 added
-        state.error = null;
+        state.user = action.payload.user;
+        state.accessToken = action.payload.accessToken;
         state.isInitialized = true;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
-        state.error = (action.payload as any)?.message || "Login failed";
+        state.error = action.payload as string;
         state.isInitialized = true;
       })
 
@@ -131,33 +131,38 @@ const authSlice = createSlice({
       .addCase(refreshUser.pending, (state) => {
         state.loading = true;
       })
-      .addCase(refreshUser.fulfilled, (state, action) => {
+      .addCase(refreshUser.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
         state.loading = false;
-        state.user = action.payload.user       // 👈 updated
-        state.accessToken = action.payload.accessToken // 👈 added
+        state.user = action.payload.user;
+        state.accessToken = action.payload.accessToken;
         state.isInitialized = true;
       })
       .addCase(refreshUser.rejected, (state, action) => {
         state.loading = false;
         state.user = null;
-        state.accessToken = null; // 👈 added
+        state.accessToken = null;
         state.isInitialized = true;
+        // Only show error if it's a real failure, not just "no session found"
         const msg = action.payload as string;
         if (msg && msg !== "NO_SESSION") {
           state.error = msg;
         }
       })
 
-      /* ---------- LOGOUT ---------- */
-      .addCase(logoutUser.fulfilled, (state) => {
-        state.user = null;
-        state.accessToken = null; // 👈 added
-        state.loading = false;
-        state.error = null;
-        state.isInitialized = true;
-      });
+      /* ---------- LOGOUT MATCHER (The Fix) ---------- */
+      // This triggers on ANY logout action (fulfilled or rejected)
+      .addMatcher(
+        (action) => action.type.startsWith("auth/logoutUser"),
+        (state) => {
+          state.user = null;
+          state.accessToken = null;
+          state.loading = false;
+          state.error = null;
+          state.isInitialized = true;
+        }
+      );
   },
 });
 
-export const { clearError, clearUser, resetAuthFlags } = authSlice.actions;
+export const { clearError, clearUser } = authSlice.actions;
 export default authSlice.reducer;

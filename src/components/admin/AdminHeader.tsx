@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom"; // 👈 added useNavigate
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   User, Bell, BellOff, Search, Calendar, ChevronRight, Loader2, LogOut, Settings
 } from "lucide-react";
-import toast from "react-hot-toast"; // 👈 added
+import toast from "react-hot-toast";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { subscribeUserToPush } from "../../store/slices/pushSlice";
 import { logoutUser } from "../../store/slices/adminAuthSlice";
@@ -12,7 +12,7 @@ import { clearUnreadCount } from "../../store/slices/adminMessageSlice";
 const AdminHeader: React.FC = () => {
   const dispatch = useAppDispatch();
   const location = useLocation();
-  const navigate = useNavigate(); // 👈 added
+  const navigate = useNavigate();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -43,18 +43,24 @@ const AdminHeader: React.FC = () => {
     }
   };
 
-  // 👇 updated logout handler
+  // Updated logout handler with Local-First logic
   const handleLogout = async () => {
-    setIsProfileOpen(false)
-    const toastId = toast.loading("Signing out...")
+    setIsProfileOpen(false);
+    const toastId = toast.loading("Terminating session...", {
+      style: { background: '#355E3B', color: '#fff', fontSize: '10px', fontWeight: 'bold' }
+    });
+
     try {
-      await dispatch(logoutUser()).unwrap()
-      toast.success("Signed out successfully", { id: toastId })
-      navigate("/login", { replace: true }) // 👈 redirect after logout
-    } catch {
-      toast.error("Logout failed", { id: toastId })
+      // The Matcher in adminAuthSlice clears local state immediately on dispatch
+      await dispatch(logoutUser()).unwrap();
+      toast.success("Session Terminated", { id: toastId });
+      navigate("/login", { replace: true });
+    } catch (error) {
+      // Ensures redirect even if the server is unreachable, as local state is already wiped
+      toast.success("Logged out (Session Cleared)", { id: toastId });
+      navigate("/login", { replace: true });
     }
-  }
+  };
 
   const getPageTitle = () => {
     const path = location.pathname.split("/").pop();
@@ -161,7 +167,7 @@ const AdminHeader: React.FC = () => {
               </button>
               <div className="h-px bg-slate-100 my-1" />
               <button
-                onClick={handleLogout} // 👈 updated
+                onClick={handleLogout}
                 className="w-full flex items-center gap-3 px-3 py-2.5 text-[11px] font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               >
                 <LogOut size={14} /> Sign Out
