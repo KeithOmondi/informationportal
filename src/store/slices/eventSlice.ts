@@ -16,11 +16,16 @@ export interface IEvent {
   title: string;
   description: string;
   location: string;
-  startDate: string; // ISO String from Backend
-  endDate: string;   // ISO String from Backend
+  startDate: string; 
+  endDate: string;   
   status: EventStatus;
   isMandatory: boolean;
   capacity?: number;
+  // Updated: Optional image field to match Backend
+  image?: {
+    url: string;
+    publicId: string;
+  };
   createdBy: string | { _id: string; name: string; role: string };
   createdAt: string;
   updatedAt?: string;
@@ -101,12 +106,16 @@ export const fetchPublicEventById = createAsyncThunk(
   },
 );
 
+/**
+ * Updated: createEvent now accepts FormData to support optional image upload
+ */
 export const createEvent = createAsyncThunk(
   "events/create",
-  async (formData: Partial<IEvent>, thunkAPI) => {
+  async (formData: FormData, thunkAPI) => {
     try {
       const { data } = await api.post("/events/create", formData, {
         withCredentials: true,
+        headers: { "Content-Type": "multipart/form-data" },
       });
       return data;
     } catch (err: any) {
@@ -117,15 +126,19 @@ export const createEvent = createAsyncThunk(
   },
 );
 
+/**
+ * Updated: updateEvent now accepts FormData for the data payload
+ */
 export const updateEvent = createAsyncThunk(
   "events/update",
   async (
-    { id, formData }: { id: string; formData: Partial<IEvent> },
+    { id, formData }: { id: string; formData: FormData },
     thunkAPI,
   ) => {
     try {
       const { data } = await api.put(`/events/update/${id}`, formData, {
         withCredentials: true,
+        headers: { "Content-Type": "multipart/form-data" },
       });
       return data;
     } catch (err: any) {
