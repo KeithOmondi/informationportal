@@ -10,14 +10,17 @@ import {
   Film,
   Image as ImageIcon,
   Play,
+  BarChart3,
 } from "lucide-react";
 import type { AppDispatch, RootState } from "../../store/store";
 import { fetchProgram } from "../../store/slices/programSlice";
 import { fetchCeremonyInfo, type Judge } from "../../store/slices/swearingPreferenceSlice";
-import { fetchPresentations, type Presentation } from "../../store/slices/presentationSlice";
+import { fetchPresentations, type Presentation, locallyIncrementDownload } from "../../store/slices/presentationSlice";
 
 import CoverP from "../../assets/CoverP.png";
 import Back from "../../assets/Back.png";
+
+const API_URL = import.meta.env.VITE_API_URL; // Assuming you have your base API URL
 
 /* =====================================================
     HELPERS
@@ -64,11 +67,16 @@ const getMimeLabel = (mimeType: string): string => {
     PRESENTATION CARD
 ===================================================== */
 const PresentationCard: React.FC<{ pres: Presentation }> = ({ pres }) => {
+  const dispatch = useDispatch<AppDispatch>();
   const isVideo = pres.fileType === "video";
 
-  const getDownloadUrl = (url: string) => {
-    if (!url || !url.includes("cloudinary.com")) return url;
-    return url.replace("/upload/", "/upload/fl_attachment/");
+  const handleDownload = () => {
+    // 1. Optimistically update UI count
+    dispatch(locallyIncrementDownload(pres._id));
+    
+    // 2. Open the tracking redirect endpoint in a new tab
+    const trackingUrl = `${API_URL}/presentations/download/${pres._id}`;
+    window.open(trackingUrl, "_blank");
   };
 
   return (
@@ -77,15 +85,12 @@ const PresentationCard: React.FC<{ pres: Presentation }> = ({ pres }) => {
         <div className="p-3 bg-[#355E3B]/5 rounded-2xl text-[#355E3B]">
           {isVideo ? <Film size={24} /> : pres.fileType === "image" ? <ImageIcon size={24} /> : <FileText size={24} />}
         </div>
-        <a
-          href={getDownloadUrl(pres.fileUrl)}
-          download={pres.fileName}
-          target="_blank"
-          rel="noreferrer"
+        <button
+          onClick={handleDownload}
           className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-[#C5A059] hover:text-[#355E3B] transition-colors"
         >
           {isVideo ? <>Watch <Play size={13} /></> : <>Download <Download size={13} /></>}
-        </a>
+        </button>
       </div>
       <div className="flex-1">
         <h3 className="text-base font-serif font-bold text-slate-800 leading-tight uppercase line-clamp-2">{pres.title}</h3>
@@ -96,8 +101,11 @@ const PresentationCard: React.FC<{ pres: Presentation }> = ({ pres }) => {
           <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full bg-slate-100 text-slate-500">{getMimeLabel(pres.mimeType)}</span>
           {pres.fileSize && <span className="text-[9px] text-slate-400 font-medium">{formatFileSize(pres.fileSize)}</span>}
         </div>
-        <div className="text-right">
-          <p className="text-[7px] text-slate-300 font-bold max-w-[100px] truncate uppercase">{pres.fileName}</p>
+        <div className="flex flex-col items-end">
+          <div className="flex items-center gap-1 mb-1">
+            <BarChart3 size={10} className="text-[#C5A059]" />
+            <span className="text-[10px] font-bold text-[#C5A059]">{pres.downloadCount || 0}</span>
+          </div>
           <span className="text-[9px] text-slate-400">{new Date(pres.createdAt).toLocaleDateString("en-KE")}</span>
         </div>
       </div>
@@ -173,7 +181,6 @@ const JudgesReligion = () => {
 
     const scheduleArray = program?.schedule || [];
     if (scheduleArray.length > 0) {
-      // Reduced weight limit slightly to account for Session Chair text lines
       const MAX_PAGE_WEIGHT = 1500; 
       scheduleArray.forEach((day: any, dayIdx: number) => {
         let currentPageActivities: any[] = [];
@@ -181,7 +188,6 @@ const JudgesReligion = () => {
         const activities = day.activities || [];
 
         activities.forEach((act: any) => {
-          // Weight calculation includes session_chair now
           const itemWeight = (act.activity?.length || 0) + 
                              (act.facilitator?.length || 0) + 
                              (act.session_chair?.length || 0) + 280;
@@ -228,11 +234,7 @@ const JudgesReligion = () => {
                 <span className="text-[#355E3B] font-mono text-[10px] font-bold shrink-0 mt-1 bg-slate-100/50 px-2 py-0.5 rounded">{act.time}</span>
                 <div className="flex-1">
                   <p className="text-[11px] font-serif font-bold text-slate-900 leading-tight uppercase">{act.activity}</p>
-                  
-                  {/* Facilitator Display */}
                   {act.facilitator && <p className="text-[9px] text-[#355E3B] italic mt-1">{formatName(act.facilitator)}</p>}
-                  
-                  {/* SESSION CHAIR UPDATE */}
                   {act.session_chair && (
                     <div className="mt-2 flex items-center gap-1.5">
                       <div className="h-px w-3 bg-[#C5A059]/40" />

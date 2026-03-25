@@ -5,8 +5,9 @@ export interface IGallery {
   _id: string;
   description: string;
   url: string;
-  downloadUrl: string;        // ← added
+  downloadUrl: string;
   resourceType: "image" | "video";
+  downloadCount: number; // ← Added for tracking
   uploadedBy?: {
     _id: string;
     name: string;
@@ -60,7 +61,6 @@ export const uploadMedia = createAsyncThunk(
       const res = await api.post(`/gallery/upload`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      // The controller now returns { message, data: IGallery[] }
       return res.data.data; 
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || "Failed to upload media");
@@ -93,58 +93,61 @@ const gallerySlice = createSlice({
       state.loading = false;
       state.error = null;
     },
+    // --- Added: Optimistic UI update for downloads ---
+    locallyIncrementGalleryDownload(state, action: PayloadAction<string>) {
+      const item = state.items.find((m) => m._id === action.payload);
+      if (item) {
+        item.downloadCount = (item.downloadCount || 0) + 1;
+      }
+    },
   },
   extraReducers: (builder) => {
-  builder
-    /* 1. SPECIFIC CASES FIRST */
-    
-    // UPLOAD
-    .addCase(uploadMedia.pending, (state) => { 
-      state.loading = true; 
-      state.error = null; 
-    })
-    .addCase(uploadMedia.fulfilled, (state, action: PayloadAction<IGallery[]>) => { 
-      state.loading = false; 
-      state.items = [...action.payload, ...state.items]; 
-    })
-
-    // DELETE
-    .addCase(deleteMedia.pending, (state) => { 
-      state.loading = true; 
-      state.error = null; 
-    })
-    .addCase(deleteMedia.fulfilled, (state, action: PayloadAction<string>) => {
-      state.loading = false;
-      state.items = state.items.filter((item: IGallery) => item._id !== action.payload);
-    })
-
-    /* 2. MATCHERS SECOND */
-
-    // FETCH & ADMIN FETCH
-    .addMatcher(
-      (action) => [fetchGallery.pending.type, fetchGalleryAdmin.pending.type].includes(action.type),
-      (state) => { 
+    builder
+      // UPLOAD
+      .addCase(uploadMedia.pending, (state) => { 
         state.loading = true; 
         state.error = null; 
-      }
-    )
-    .addMatcher(
-      (action) => [fetchGallery.fulfilled.type, fetchGalleryAdmin.fulfilled.type].includes(action.type),
-      (state, action: PayloadAction<IGallery[]>) => { 
+      })
+      .addCase(uploadMedia.fulfilled, (state, action: PayloadAction<IGallery[]>) => { 
         state.loading = false; 
-        state.items = action.payload; 
-      }
-    )
-    // REJECTED GLOBAL HANDLER
-    .addMatcher(
-      (action) => action.type.endsWith("/rejected"),
-      (state, action: any) => {
+        state.items = [...action.payload, ...state.items]; 
+      })
+
+      // DELETE
+      .addCase(deleteMedia.pending, (state) => { 
+        state.loading = true; 
+        state.error = null; 
+      })
+      .addCase(deleteMedia.fulfilled, (state, action: PayloadAction<string>) => {
         state.loading = false;
-        state.error = action.payload as string;
-      }
-    );
-},
+        state.items = state.items.filter((item: IGallery) => item._id !== action.payload);
+      })
+
+      // FETCH & ADMIN FETCH MATCHERS
+      .addMatcher(
+        (action) => [fetchGallery.pending.type, fetchGalleryAdmin.pending.type].includes(action.type),
+        (state) => { 
+          state.loading = true; 
+          state.error = null; 
+        }
+      )
+      .addMatcher(
+        (action) => [fetchGallery.fulfilled.type, fetchGalleryAdmin.fulfilled.type].includes(action.type),
+        (state, action: PayloadAction<IGallery[]>) => { 
+          state.loading = false; 
+          state.items = action.payload; 
+        }
+      )
+      // REJECTED GLOBAL HANDLER
+      .addMatcher(
+        (action) => action.type.endsWith("/rejected"),
+        (state, action: any) => {
+          state.loading = false;
+          state.error = action.payload as string;
+        }
+      );
+  },
 });
 
-export const { clearGalleryError, resetGallery } = gallerySlice.actions;
+export const { clearGalleryError, resetGallery, locallyIncrementGalleryDownload } = gallerySlice.actions;
 export default gallerySlice.reducer;

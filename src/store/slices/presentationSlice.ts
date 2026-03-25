@@ -6,12 +6,13 @@ export interface Presentation {
   title: string;
   description?: string;
   fileUrl: string;
-  downloadUrl: string;   // ← added
+  downloadUrl: string;
   publicId: string;
   fileType: "image" | "video" | "raw";
   mimeType: string;
   fileName: string;
   fileSize: number;
+  downloadCount: number; // ← Added for tracking
   createdAt: string;
 }
 
@@ -39,7 +40,6 @@ export const fetchPresentations = createAsyncThunk(
   "presentations/fetchAll",
   async (_, thunkAPI) => {
     try {
-      // Ensure this matches your backend prefix (e.g., /api/v1/presentations)
       const response = await api.get("/presentations");
       return response.data;
     } catch (error: any) {
@@ -54,10 +54,8 @@ export const uploadPresentation = createAsyncThunk(
   "presentations/upload",
   async (formData: FormData, thunkAPI) => {
     try {
-      // NOTE: Using /upload to match your controller route
       const response = await api.post("/presentations/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
-        // Important for large files to prevent client-side timeout before server 500
         timeout: 60000, 
       });
       return response.data;
@@ -93,6 +91,13 @@ const presentationSlice = createSlice({
       state.success = false;
       state.error = null;
     },
+    // Optimistic update for the UI when a user clicks the download link
+    locallyIncrementDownload: (state, action: PayloadAction<string>) => {
+      const item = state.items.find(p => p._id === action.payload);
+      if (item) {
+        item.downloadCount += 1;
+      }
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -154,5 +159,5 @@ const presentationSlice = createSlice({
   },
 });
 
-export const { resetPresentationStatus } = presentationSlice.actions;
+export const { resetPresentationStatus, locallyIncrementDownload } = presentationSlice.actions;
 export default presentationSlice.reducer;
