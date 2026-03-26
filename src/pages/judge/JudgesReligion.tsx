@@ -20,14 +20,15 @@ import { fetchPresentations, type Presentation, locallyIncrementDownload } from 
 import CoverP from "../../assets/CoverP.png";
 import Back from "../../assets/Back.png";
 
-const API_URL = import.meta.env.VITE_API_URL; // Assuming you have your base API URL
+const API_URL = import.meta.env.VITE_API_URL;
 
 /* =====================================================
     HELPERS
 ===================================================== */
 const formatName = (str: string) => {
   if (!str) return "";
-  const upperHonors = ["EBS", "OGW", "PHD", "SC", "SCJ", "CBS", "EGH", "FCI", "ARB"];
+  // Added "JSC" to ensure it remains uppercase
+  const upperHonors = ["EBS", "OGW", "PHD", "SC", "SCJ", "CBS", "EGH", "FCI", "ARB", "JSC"];
   const mixedHonors: Record<string, string> = {
     DR: "Dr.", "DR.": "Dr.", RTD: "Rtd", "RTD.": "Rtd.", "H.E": "H.E.", "H.E.": "H.E.",
   };
@@ -71,10 +72,7 @@ const PresentationCard: React.FC<{ pres: Presentation }> = ({ pres }) => {
   const isVideo = pres.fileType === "video";
 
   const handleDownload = () => {
-    // 1. Optimistically update UI count
     dispatch(locallyIncrementDownload(pres._id));
-    
-    // 2. Open the tracking redirect endpoint in a new tab
     const trackingUrl = `${API_URL}/presentations/download/${pres._id}`;
     window.open(trackingUrl, "_blank");
   };
@@ -234,7 +232,18 @@ const JudgesReligion = () => {
                 <span className="text-[#355E3B] font-mono text-[10px] font-bold shrink-0 mt-1 bg-slate-100/50 px-2 py-0.5 rounded">{act.time}</span>
                 <div className="flex-1">
                   <p className="text-[11px] font-serif font-bold text-slate-900 leading-tight uppercase">{act.activity}</p>
-                  {act.facilitator && <p className="text-[9px] text-[#355E3B] italic mt-1">{formatName(act.facilitator)}</p>}
+                  
+                  {/* Updated Facilitator Point Form Display */}
+                  {act.facilitator && (
+                    <div className="mt-1 space-y-0.5">
+                      {act.facilitator.split('\n').map((name: string, idx: number) => (
+                        <p key={idx} className="text-[9px] text-[#355E3B] italic flex items-start gap-1">
+                          <span className="text-[#C5A059]">•</span> {formatName(name.trim())}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+
                   {act.session_chair && (
                     <div className="mt-2 flex items-center gap-1.5">
                       <div className="h-px w-3 bg-[#C5A059]/40" />
