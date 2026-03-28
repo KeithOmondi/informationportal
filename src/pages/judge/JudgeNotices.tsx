@@ -203,7 +203,7 @@ const JudgeNoticesPage = () => {
                         className="w-full group flex items-center justify-center gap-4 bg-[#355E3B] text-white px-10 py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-[#355E3B]/20 hover:bg-[#2a4a2e] transition-all"
                       >
                         <Download size={18} strokeWidth={3} className="group-hover:translate-y-0.5 transition-transform" />
-                        Download PDF • {formatFileSize(notice.attachments[0]?.fileSize)}
+                        View File • {formatFileSize(notice.attachments[0]?.fileSize)}
                       </button>
                     ) : (
                       <div className="flex items-center gap-2 px-6 py-4 bg-slate-50 rounded-xl border border-slate-100">
