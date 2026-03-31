@@ -21,11 +21,9 @@ const JudgeHeader = ({ toggleSidebar }: JudgeHeaderProps) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   
-  // 1. Fetch Profile from userSlice (IUser)
+  // State Selectors
   const { profile, loading: userLoading } = useAppSelector((state) => state.users);
-  // 2. Auth loading state for the logout button
   const { loading: authLoading } = useAppSelector((state) => state.auth);
-  
   const { permission, loading: pushLoading } = useAppSelector((state) => state.push);
   const { groups } = useAppSelector((state) => state.userChat);
 
@@ -50,6 +48,7 @@ const JudgeHeader = ({ toggleSidebar }: JudgeHeaderProps) => {
     return groups.reduce((acc, group) => acc + (group.unreadCount || 0), 0);
   }, [groups]);
 
+  // Outside Click Handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -69,14 +68,23 @@ const JudgeHeader = ({ toggleSidebar }: JudgeHeaderProps) => {
     }
   };
 
+  /* ===========================
+      UPDATED LOGOUT HANDLER
+  =========================== */
   const handleLogout = async () => {
+    const toastId = toast.loading("Terminating Judicial Session...");
     try {
-      await dispatch(logoutUser()).unwrap();
+      // Pass 'false' to match the boolean requirement of your new logoutUser thunk
+      await dispatch(logoutUser(false)).unwrap();
+      
       toast.success("Session Terminated", {
+        id: toastId,
         style: { background: '#355E3B', color: '#fff', fontSize: '10px', fontWeight: 'bold' }
       });
     } catch (error) {
-      console.error("Local session cleared despite server error.");
+      // Even if the server fails, the slice clears the local state via .addMatcher
+      toast.error("Session cleared locally", { id: toastId });
+      console.error("Logout error:", error);
     }
   };
 
@@ -166,7 +174,7 @@ const JudgeHeader = ({ toggleSidebar }: JudgeHeaderProps) => {
           
           <div className="h-8 w-px bg-slate-200 mx-1 hidden sm:block" />
 
-          {/* Judicial Identity (Using UserSlice Profile) */}
+          {/* Judicial Identity */}
           <div className="relative" ref={profileRef}>
             <div 
               onClick={() => { setIsProfileOpen(!isProfileOpen); setIsNotifOpen(false); }}

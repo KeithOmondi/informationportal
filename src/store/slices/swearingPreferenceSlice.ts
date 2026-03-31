@@ -9,14 +9,16 @@ import { api } from "../../api/axios";
     TYPES
 ===================================================== */
 
+export type UserRole = "judge" | "dr" | "admin" | "all";
+
 export interface Judge {
   _id: string;
   name: string;
   title: string;
-  description: string; // Aligned with Mongoose Schema
+  description: string;
   imageUrl: string;
   imagePublicId: string;
-  resourceType?: string;
+  targetAudience: UserRole[];
 }
 
 export interface Presentation {
@@ -27,29 +29,12 @@ export interface Presentation {
   publicId: string;
   resourceType: string;
   uploadedAt: string;
-}
-
-export interface ProgramItem {
-  _id?: string;
-  time?: string;
-  event?: string;
-  location?: string;
-  iconType?: string;
-}
-
-export interface ProgramData {
-  items: ProgramItem[];
-  scheduledRelease: string | null;
-  programFileUrl?: string | null;
-  programFilePublicId?: string;
-  programFileResourceType?: string;
-  isLocked?: boolean; // Returned by getCourtInfo logic
+  targetAudience: UserRole[];
 }
 
 interface CeremonyState {
   judges: Judge[];
   presentations: Presentation[];
-  program: ProgramData;
   loading: boolean;
   error: string | null;
   success: boolean;
@@ -58,12 +43,6 @@ interface CeremonyState {
 const initialState: CeremonyState = {
   judges: [],
   presentations: [],
-  program: {
-    items: [],
-    scheduledRelease: null,
-    programFileUrl: null,
-    isLocked: false,
-  },
   loading: false,
   error: null,
   success: false,
@@ -73,105 +52,97 @@ const initialState: CeremonyState = {
     ASYNC THUNKS
 ===================================================== */
 
-// Fetch all info (respects admin/release time logic)
-export const fetchCeremonyInfo = createAsyncThunk<
-  any,
-  void,
-  { rejectValue: string }
->("ceremony/fetchAll", async (_, thunkAPI) => {
-  try {
-    const response = await api.get(`/oath/court-info/`);
-    return response.data;
-  } catch (error: any) {
-    return thunkAPI.rejectWithValue(
-      error.response?.data?.message || "Failed to fetch ceremony data",
-    );
+export const fetchCeremonyInfo = createAsyncThunk<any, UserRole | undefined, { rejectValue: string }>(
+  "ceremony/fetchAll",
+  async (role, thunkAPI) => {
+    try {
+      const response = await api.get("/oath/court-info", {
+        params: role ? { role } : {},
+      });
+      return response.data;
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Failed to fetch ceremony data"
+      );
+    }
   }
-});
+);
 
-// Update Program (Items, Schedule, and File)
-export const updateProgram = createAsyncThunk<
-  any,
-  FormData,
-  { rejectValue: string }
->("ceremony/updateProgram", async (formData, thunkAPI) => {
-  try {
-    const response = await api.put(`/oath/court-info/program`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    return response.data; // Returns { message, program }
-  } catch (error: any) {
-    return thunkAPI.rejectWithValue(
-      error.response?.data?.message || "Failed to update program",
-    );
+export const fetchAdminDashboard = createAsyncThunk<any, void, { rejectValue: string }>(
+  "ceremony/fetchAdmin",
+  async (_, thunkAPI) => {
+    try {
+      const response = await api.get("/oath/court-info/admin/dashboard");
+      return response.data;
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Failed to fetch admin data"
+      );
+    }
   }
-});
+);
 
-export const addJudgeBio = createAsyncThunk<
-  any,
-  FormData,
-  { rejectValue: string }
->("ceremony/addJudge", async (formData, thunkAPI) => {
-  try {
-    const response = await api.post(`/oath/court-info/bios`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    return response.data;
-  } catch (error: any) {
-    return thunkAPI.rejectWithValue(
-      error.response?.data?.message || "Failed to add judge profile",
-    );
+export const addJudgeBio = createAsyncThunk<any, FormData, { rejectValue: string }>(
+  "ceremony/addJudge",
+  async (formData, thunkAPI) => {
+    try {
+      const response = await api.post("/oath/court-info/bios", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response.data;
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Failed to add judge profile"
+      );
+    }
   }
-});
+);
 
-export const updateJudgeBio = createAsyncThunk<
-  any,
-  { judgeId: string; formData: FormData },
-  { rejectValue: string }
->("ceremony/updateJudge", async ({ judgeId, formData }, thunkAPI) => {
-  try {
-    const response = await api.patch(`/oath/court-info/bios/${judgeId}`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    return response.data;
-  } catch (error: any) {
-    return thunkAPI.rejectWithValue(
-      error.response?.data?.message || "Failed to update judge profile",
-    );
+export const updateJudgeBio = createAsyncThunk<any, { judgeId: string; formData: FormData }, { rejectValue: string }>(
+  "ceremony/updateJudge",
+  async ({ judgeId, formData }, thunkAPI) => {
+    try {
+      const response = await api.patch(`/oath/court-info/judge/${judgeId}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response.data;
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Failed to update judge profile"
+      );
+    }
   }
-});
+);
 
-export const addPresentation = createAsyncThunk<
-  any,
-  FormData,
-  { rejectValue: string }
->("ceremony/addPresentation", async (formData, thunkAPI) => {
-  try {
-    const response = await api.post(`/oath/court-info/presentations`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    return response.data;
-  } catch (error: any) {
-    return thunkAPI.rejectWithValue(
-      error.response?.data?.message || "Failed to upload presentation",
-    );
+export const addPresentation = createAsyncThunk<any, FormData, { rejectValue: string }>(
+  "ceremony/addPresentation",
+  async (formData, thunkAPI) => {
+    try {
+      const response = await api.post("/oath/court-info/presentations", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response.data;
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Failed to upload presentation"
+      );
+    }
   }
-});
+);
 
-export const deleteCeremonyItem = createAsyncThunk<
-  any,
-  { type: "judges" | "presentations"; id: string },
-  { rejectValue: string }
->("ceremony/deleteItem", async ({ type, id }, thunkAPI) => {
-  try {
-    const response = await api.delete(`/oath/court-info/${type}/${id}`);
-    return response.data;
-  } catch (error: any) {
-    return thunkAPI.rejectWithValue(
-      error.response?.data?.message || "Failed to delete item",
-    );
+export const deleteCeremonyItem = createAsyncThunk<any, { type: "judges" | "presentations"; id: string }, { rejectValue: string }>(
+  "ceremony/deleteItem",
+  async ({ type, id }, thunkAPI) => {
+    try {
+      const response = await api.delete(`/oath/court-info/${type}/${id}`);
+      return response.data;
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Failed to delete item"
+      );
+    }
   }
-});
+);
 
 /* =====================================================
     SLICE
@@ -188,50 +159,48 @@ const ceremonySlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Fetch Logic
-      .addCase(fetchCeremonyInfo.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(fetchCeremonyInfo.fulfilled, (state, action: PayloadAction<any>) => {
-        state.loading = false;
-        state.judges = action.payload.judges || [];
-        state.presentations = action.payload.presentations || [];
-        state.program = action.payload.program || initialState.program;
-      })
-
-      // Universal Success Matcher (Updates program, judges, or presentations)
+      // Fetch matchers (Public & Admin)
       .addMatcher(
-        (action) => action.type.endsWith("/fulfilled") && action.type !== "ceremony/fetchAll/fulfilled",
+        (action) =>
+          action.type === fetchCeremonyInfo.fulfilled.type ||
+          action.type === fetchAdminDashboard.fulfilled.type,
+        (state, action: PayloadAction<any>) => {
+          state.loading = false;
+          const source = action.payload.data || action.payload;
+          state.judges = source.judges || [];
+          state.presentations = source.presentations || [];
+        }
+      )
+
+      // Mutation matcher (Add, Update, Delete)
+      .addMatcher(
+        (action) =>
+          [
+            addJudgeBio.fulfilled.type,
+            updateJudgeBio.fulfilled.type,
+            addPresentation.fulfilled.type,
+            deleteCeremonyItem.fulfilled.type,
+          ].includes(action.type),
         (state, action: PayloadAction<any>) => {
           state.loading = false;
           state.success = true;
-          
-          const payload = action.payload;
-          
-          // If the backend returns the full document (like in delete/add judge)
-          const data = payload.data || payload;
-          
+          const data = action.payload.data || action.payload;
           if (data.judges) state.judges = data.judges;
           if (data.presentations) state.presentations = data.presentations;
-          
-          // Specific check for the updateProgram response { message, program }
-          if (data.program) {
-            state.program = {
-                ...state.program,
-                ...data.program
-            };
-          }
         }
       )
-      // Universal Pending/Error Matchers
+
+      // Pending
       .addMatcher(
-        (action) => action.type.endsWith("/pending") && action.type !== "ceremony/fetchAll/pending",
+        (action) => action.type.endsWith("/pending"),
         (state) => {
           state.loading = true;
           state.error = null;
           state.success = false;
         }
       )
+
+      // Rejected
       .addMatcher(
         (action) => action.type.endsWith("/rejected"),
         (state, action: PayloadAction<any>) => {

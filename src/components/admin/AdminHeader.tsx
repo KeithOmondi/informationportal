@@ -6,8 +6,11 @@ import {
 import toast from "react-hot-toast";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { subscribeUserToPush } from "../../store/slices/pushSlice";
-import { logoutUser } from "../../store/slices/adminAuthSlice";
+/* ============================================================
+    FIX 1: Point to the correct Slice (authSlice)
+   ============================================================ */
 import { clearUnreadCount } from "../../store/slices/adminMessageSlice";
+import { logoutUser } from "../../store/slices/adminAuthSlice";
 
 const AdminHeader: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -43,7 +46,9 @@ const AdminHeader: React.FC = () => {
     }
   };
 
-  // Updated logout handler with Local-First logic
+  /* ============================================================
+      FIX 2: Provide the required boolean argument to logoutUser
+     ============================================================ */
   const handleLogout = async () => {
     setIsProfileOpen(false);
     const toastId = toast.loading("Terminating session...", {
@@ -51,12 +56,13 @@ const AdminHeader: React.FC = () => {
     });
 
     try {
-      // The Matcher in adminAuthSlice clears local state immediately on dispatch
-      await dispatch(logoutUser()).unwrap();
+      // Pass 'false' (allDevices) to satisfy the thunk's argument requirement
+      await dispatch(logoutUser(false)).unwrap();
+      
       toast.success("Session Terminated", { id: toastId });
       navigate("/login", { replace: true });
     } catch (error) {
-      // Ensures redirect even if the server is unreachable, as local state is already wiped
+      // Matcher in authSlice ensures local state is wiped even if the request fails
       toast.success("Logged out (Session Cleared)", { id: toastId });
       navigate("/login", { replace: true });
     }

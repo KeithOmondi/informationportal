@@ -14,14 +14,13 @@ import {
   X,
   Megaphone,
   Check,
-  ChevronLeft,
-  Menu,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 import type { AppDispatch, RootState } from "../../store/store";
 import {
   type Message,
+  type MessageAudience,
   sendMessage,
   fetchChatMessages,
   receiveMessage,
@@ -31,12 +30,11 @@ import {
   fetchUsers,
   addToActiveConversations,
   fetchActiveConversations,
-  type IUser,
 } from "../../store/slices/adminUserSlice";
 import { getSocket } from "../../services/socket";
 
 type BroadcastEntry = { _id: string; name: string; isBroadcast: true };
-type SidebarItem = IUser | BroadcastEntry;
+type SidebarItem = any | BroadcastEntry;
 
 const AdminMessages: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -61,10 +59,11 @@ const AdminMessages: React.FC = () => {
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [broadcastMessage, setBroadcastMessage] = useState("");
   const [isGlobalBroadcast, setIsGlobalBroadcast] = useState(false);
+  const [broadcastAudience, setBroadcastAudience] = useState<MessageAudience>("ALL");
 
   // --- REDUX DATA ---
-  const { chatMessages } = useSelector((state: RootState) => state.adminChat);
-  const { user: admin } = useSelector((state: RootState) => state.auth);
+  const { chatMessages, sending } = useSelector((state: RootState) => state.adminChat);
+  const { profile: admin } = useSelector((state: RootState) => state.users); // Adjusted to profile from adminUserSlice
   const { users: allUsers, activeConversationIds } = useSelector(
     (state: RootState) => state.users,
   );
@@ -94,7 +93,7 @@ const AdminMessages: React.FC = () => {
       return isPersistent && matchesCohort;
     });
 
-    const broadcastEntry: BroadcastEntry = { _id: "broadcast_global", name: "ORHC Broadcasts", isBroadcast: true };
+    const broadcastEntry: BroadcastEntry = { _id: "broadcast_global", name: "Official Broadcasts", isBroadcast: true };
     if (selectedCohort === "all" && (searchQuery.trim() === "" || "broadcast".includes(searchQuery.toLowerCase()))) {
       return [broadcastEntry, ...filteredUsers];
     }
@@ -111,7 +110,8 @@ const AdminMessages: React.FC = () => {
         u.pj.toLowerCase().includes(query) ||
         u.role.toLowerCase().includes(query)
       );
-      return matchesCohort && matchesSearch;
+      // Validating against the new Judicial Roles
+      return matchesCohort && matchesSearch && (u.role === "judge" || u.role === "dr");
     });
   }, [allUsers, recipientSearch, modalCohortFilter]);
 
@@ -130,7 +130,13 @@ const AdminMessages: React.FC = () => {
     const handleNewMessage = (msg: Message) => {
       const sId = typeof msg.sender === "string" ? msg.sender : msg.sender?._id;
       const rId = typeof msg.receiver === "string" ? msg.receiver : msg.receiver?._id;
-      if (selectedChat?.id === sId || selectedChat?.id === rId || (selectedChat?.isBroadcast && msg.isBroadcast)) {
+      
+      const isRelevant = 
+        selectedChat?.id === sId || 
+        selectedChat?.id === rId || 
+        (selectedChat?.isBroadcast && msg.isBroadcast);
+
+      if (isRelevant) {
         dispatch(receiveMessage(msg));
       }
     };
@@ -148,103 +154,112 @@ const AdminMessages: React.FC = () => {
 
   const handleSendMessage = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!selectedChat?.id || !inputText.trim()) return;
+    if (!selectedChat?.id || !inputText.trim() || sending) return;
+    
     try {
-      const payload = selectedChat.isBroadcast
-        ? { text: inputText.trim(), isBroadcast: true }
-        : { text: inputText.trim(), receiver: selectedChat.id, receivers: [selectedChat.id] };
+      const recipient = allUsers.find(u => u._id === selectedChat.id);
+      const payload: any = { text: inputText.trim() };
+
+      if (selectedChat.isBroadcast) {
+        payload.isBroadcast = true;
+        payload.audience = "ALL";
+      } else {
+        payload.receiver = selectedChat.id;
+        payload.targetRole = recipient?.role; 
+      }
+
       const result = await dispatch(sendMessage(payload)).unwrap();
-      getSocket()?.emit(selectedChat.isBroadcast ? "message:broadcast" : "message:send", result);
+      
+      const socket = getSocket();
+      const messages = Array.isArray(result) ? result : [result];
+      messages.forEach(m => socket?.emit(m.isBroadcast ? "message:broadcast" : "message:send", m));
+
       if (!selectedChat.isBroadcast) dispatch(addToActiveConversations(selectedChat.id));
       setInputText("");
     } catch (err: any) {
-      toast.error("Failed to transmit.");
+      toast.error(err || "Failed to transmit.");
     }
-  }, [dispatch, selectedChat, inputText]);
+  }, [dispatch, selectedChat, inputText, allUsers, sending]);
 
   const handleBroadcastSubmit = async () => {
     if (!isGlobalBroadcast && selectedRecipients.length === 0) return toast.error("Select recipients");
     if (!broadcastMessage.trim()) return toast.error("Message empty");
+
     try {
+      let result;
       if (isGlobalBroadcast) {
-        const result = await dispatch(sendMessage({ text: broadcastMessage, isBroadcast: true })).unwrap();
-        getSocket()?.emit("message:broadcast", result);
-        setSelectedChat({ id: "broadcast_global", name: "ORHC Broadcasts", isBroadcast: true });
+        result = await dispatch(sendMessage({ 
+          text: broadcastMessage, 
+          isBroadcast: true,
+          audience: broadcastAudience 
+        })).unwrap();
+        setSelectedChat({ id: "broadcast_global", name: "Official Broadcasts", isBroadcast: true });
       } else {
-        const results = await dispatch(sendMessage({ text: broadcastMessage, receivers: selectedRecipients })).unwrap();
-        if (Array.isArray(results)) {
-          results.forEach((msg) => {
-            getSocket()?.emit("message:send", msg);
-            const tid = typeof msg.receiver === "string" ? msg.receiver : msg.receiver?._id;
-            if (tid) dispatch(addToActiveConversations(tid));
-          });
-        }
+        const firstRecipient = allUsers.find(u => u._id === selectedRecipients[0]);
+        result = await dispatch(sendMessage({ 
+          text: broadcastMessage, 
+          receivers: selectedRecipients,
+          targetRole: firstRecipient?.role as "judge" | "dr"
+        })).unwrap();
+      }
+
+      const socket = getSocket();
+      const messages = Array.isArray(result) ? result : [result];
+      messages.forEach((msg) => {
+        socket?.emit(msg.isBroadcast ? "message:broadcast" : "message:send", msg);
+        const tid = typeof msg.receiver === "string" ? msg.receiver : msg.receiver?._id;
+        if (tid && !msg.isBroadcast) dispatch(addToActiveConversations(tid));
+      });
+
+      if (!isGlobalBroadcast) {
         const lastId = selectedRecipients[selectedRecipients.length - 1];
         setSelectedChat({ id: lastId, name: allUsers.find(u => u._id === lastId)?.name || "User" });
       }
+
       setIsBroadcastModalOpen(false);
       setBroadcastMessage(""); 
       setSelectedRecipients([]);
-      setRecipientSearch("");
-      setModalCohortFilter("all");
       toast.success("Correspondence dispatched.");
-    } catch (err: any) { toast.error("Dispatch failed"); }
+    } catch (err: any) { 
+      toast.error(err || "Dispatch failed"); 
+    }
   };
 
   return (
     <div className="flex h-[calc(100vh-160px)] bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden font-sans">
       
-      {/* SIDEBAR WITH HOVER & TOGGLE */}
+      {/* SIDEBAR */}
       <div 
         onMouseEnter={() => setIsSidebarExpanded(true)}
         onMouseLeave={() => setIsSidebarExpanded(false)}
-        className={`
-          relative border-r border-slate-100 flex flex-col bg-slate-50/50 
-          transition-all duration-300 ease-in-out
-          ${isSidebarExpanded ? "w-80" : "w-20"}
-        `}
+        className={`relative border-r border-slate-100 flex flex-col bg-slate-50/50 transition-all duration-300 ease-in-out ${isSidebarExpanded ? "w-80" : "w-20"}`}
       >
         <div className="p-4 bg-white space-y-3 shadow-sm z-10 overflow-hidden">
-          <div className="flex items-center justify-between gap-2">
-            <button 
-               onClick={() => setIsBroadcastModalOpen(true)} 
-               className={`bg-[#355E3B] text-white rounded-xl flex items-center justify-center font-bold text-xs hover:bg-[#2a4b2f] transition-all shrink-0 ${isSidebarExpanded ? "w-full py-3 px-2 gap-2" : "h-12 w-12"}`}
-            >
-              <Plus size={18} className="text-[#EFBF04]" /> 
-              {isSidebarExpanded && <span className="whitespace-nowrap">NEW MESSAGE</span>}
-            </button>
-            
-            {/* Manual Toggle Menu Button */}
-            {isSidebarExpanded && (
-              <button 
-                onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
-                className="p-2 text-slate-400 hover:text-[#355E3B] hidden lg:block"
-              >
-                <ChevronLeft size={20} />
-              </button>
-            )}
-          </div>
+          <button 
+             onClick={() => setIsBroadcastModalOpen(true)} 
+             className={`bg-[#1a3a32] text-white rounded-xl flex items-center justify-center font-bold text-xs hover:bg-[#122923] transition-all shrink-0 ${isSidebarExpanded ? "w-full py-3 px-2 gap-2" : "h-12 w-12"}`}
+          >
+            <Plus size={18} className="text-[#c2a336]" /> 
+            {isSidebarExpanded && <span className="whitespace-nowrap tracking-wider">NEW MESSAGE</span>}
+          </button>
 
           {isSidebarExpanded && (
-            <>
-              <div className="relative animate-in fade-in duration-300">
+            <div className="space-y-3 animate-in fade-in duration-300">
+              <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-100 rounded-lg text-xs outline-none focus:ring-1 ring-[#355E3B]/20" />
+                <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-100 rounded-lg text-xs outline-none focus:ring-1 ring-[#1a3a32]/20" />
               </div>
-              <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar animate-in fade-in duration-500">
-                <button onClick={() => setSelectedCohort("all")} className={`px-3 py-1 rounded-full text-[9px] font-black transition-all border ${selectedCohort === "all" ? "bg-[#355E3B] text-white border-[#355E3B]" : "bg-white text-slate-400 border-slate-200"}`}>ALL</button>
+              <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                <button onClick={() => setSelectedCohort("all")} className={`px-3 py-1 rounded-full text-[9px] font-black transition-all border ${selectedCohort === "all" ? "bg-[#1a3a32] text-white border-[#1a3a32]" : "bg-white text-slate-400 border-slate-200"}`}>ALL</button>
                 {availableCohorts.map(c => (
-                  <button key={c} onClick={() => setSelectedCohort(c)} className={`px-3 py-1 rounded-full text-[9px] font-black transition-all border ${selectedCohort === c ? "bg-[#EFBF04] text-[#355E3B] border-[#EFBF04]" : "bg-white text-slate-400 border-slate-200"}`}>C{c}</button>
+                  <button key={c} onClick={() => setSelectedCohort(c)} className={`px-3 py-1 rounded-full text-[9px] font-black transition-all border ${selectedCohort === c ? "bg-[#c2a336] text-[#1a3a32] border-[#c2a336]" : "bg-white text-slate-400 border-slate-200"}`}>C{c}</button>
                 ))}
               </div>
-            </>
+            </div>
           )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 py-4">
-          {isSidebarExpanded && (
-            <h2 className="px-2 mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 animate-in slide-in-from-left-2">Registry</h2>
-          )}
           <div className="space-y-1">
             {activeChatPersonnel.map((item) => {
               const isBroad = 'isBroadcast' in item;
@@ -253,27 +268,18 @@ const AdminMessages: React.FC = () => {
                 <button
                   key={item._id}
                   onClick={() => setSelectedChat({ id: item._id, name: item.name, isBroadcast: isBroad })}
-                  className={`
-                    w-full flex items-center transition-all rounded-xl relative
-                    ${isSidebarExpanded ? "p-3 px-4 gap-3" : "p-3 justify-center"}
-                    ${isActive ? "bg-white border-r-4 border-[#EFBF04] shadow-sm text-[#355E3B]" : "hover:bg-white text-slate-700"}
-                  `}
+                  className={`w-full flex items-center transition-all rounded-xl relative ${isSidebarExpanded ? "p-3 px-4 gap-3" : "p-3 justify-center"} ${isActive ? "bg-white border-r-4 border-[#c2a336] shadow-sm text-[#1a3a32]" : "hover:bg-white text-slate-700"}`}
                 >
-                  <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 ${isActive ? "bg-[#355E3B] text-white" : "bg-slate-300 text-white"}`}>
-                    {isBroad ? <Megaphone size={16} className="text-[#EFBF04]" /> : item.name.charAt(0)}
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 ${isActive ? "bg-[#1a3a32] text-white" : "bg-slate-300 text-white"}`}>
+                    {isBroad ? <Megaphone size={16} className="text-[#c2a336]" /> : item.name.charAt(0)}
                   </div>
-                  
                   {isSidebarExpanded && (
-                    <div className="text-left overflow-hidden animate-in fade-in duration-300">
+                    <div className="text-left overflow-hidden">
                       <p className="text-sm font-bold truncate">{item.name}</p>
-                      <p className="text-[9px] text-[#C5A059] font-black uppercase tracking-tighter">
-                        {isBroad ? "Official Channel" : `PJ: ${item.pj} • C${item.cohort || '?'}`}
+                      <p className="text-[9px] text-[#c2a336] font-black uppercase tracking-tighter">
+                        {isBroad ? "Official Channel" : `PJ: ${item.pj} • ${item.role?.toUpperCase()}`}
                       </p>
                     </div>
-                  )}
-
-                  {!isSidebarExpanded && isActive && (
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-[#EFBF04] rounded-l-full" />
                   )}
                 </button>
               );
@@ -287,28 +293,23 @@ const AdminMessages: React.FC = () => {
         {selectedChat ? (
           <>
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white shadow-sm">
-              <div className="flex items-center gap-3">
-                 {!isSidebarExpanded && (
-                   <button onClick={() => setIsSidebarExpanded(true)} className="lg:hidden p-2 text-slate-400">
-                     <Menu size={20} />
-                   </button>
-                 )}
-                <div>
-                  <h3 className="font-serif font-bold text-[#355E3B] text-lg leading-tight">{selectedChat.name}</h3>
-                  <p className="text-[10px] font-black uppercase text-[#C5A059]">{selectedChat.isBroadcast ? "ORHC Announcements" : "Secure Correspondence"}</p>
-                </div>
+              <div>
+                <h3 className="font-serif font-bold text-[#1a3a32] text-lg leading-tight">{selectedChat.name}</h3>
+                <p className="text-[10px] font-black uppercase text-[#c2a336]">{selectedChat.isBroadcast ? "Registry Announcements" : "Secure Judicial Briefing"}</p>
               </div>
             </div>
             
             <div className="flex-1 overflow-y-auto p-6 bg-[#fcfdfc]">
               {chatMessages.map((msg, i) => {
-                const isFromMe = (typeof msg.sender === "string" ? msg.sender : msg.sender?._id) === admin?._id;
+                const senderId = typeof msg.sender === "string" ? msg.sender : msg.sender?._id;
+                const isFromMe = senderId === admin?._id;
                 return (
-                  <div key={i} className={`w-full flex flex-col mb-4 ${isFromMe ? "items-end" : "items-start"}`}>
-                    <div className={`max-w-[70%] p-4 shadow-sm border ${isFromMe ? "bg-[#355E3B] text-white rounded-2xl rounded-tr-none border-[#2a4b2f]" : "bg-white text-slate-800 rounded-2xl rounded-tl-none border-slate-100"}`}>
+                  <div key={msg._id || i} className={`w-full flex flex-col mb-4 ${isFromMe ? "items-end" : "items-start"}`}>
+                    <div className={`max-w-[70%] p-4 shadow-sm border ${isFromMe ? "bg-[#1a3a32] text-white rounded-2xl rounded-tr-none border-[#122923]" : "bg-white text-slate-800 rounded-2xl rounded-tl-none border-slate-100"}`}>
+                      {selectedChat.isBroadcast && !isFromMe && <p className="text-[9px] font-black text-[#c2a336] uppercase mb-1">REGISTRY ADMIN</p>}
                       <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                      <div className={`flex items-center gap-2 mt-2 opacity-60 ${isFromMe ? "justify-end" : "justify-start"}`}>
-                        <span className="text-[9px]">{new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                      <div className={`flex items-center gap-2 mt-2 opacity-60 justify-end text-[9px]`}>
+                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </div>
                     </div>
                   </div>
@@ -318,14 +319,16 @@ const AdminMessages: React.FC = () => {
             </div>
 
             <form onSubmit={handleSendMessage} className="p-5 border-t border-slate-100 flex items-center gap-4 bg-white">
-              <input value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder="Type a message..." className="flex-1 rounded-xl px-5 py-3 text-sm bg-slate-100 outline-none focus:ring-1 ring-[#355E3B]/10" />
-              <button type="submit" className="bg-[#355E3B] text-white p-3.5 rounded-xl hover:bg-[#2a4b2f] transition-colors"><Send size={20} /></button>
+              <input value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder="Type an official message..." className="flex-1 rounded-xl px-5 py-3 text-sm bg-slate-100 outline-none" />
+              <button type="submit" disabled={sending} className="bg-[#1a3a32] text-white p-3.5 rounded-xl hover:bg-[#122923] transition-colors disabled:opacity-50">
+                <Send size={20} />
+              </button>
             </form>
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center opacity-10">
-            <Scale size={120} className="text-[#355E3B]" />
-            <p className="font-serif italic text-xl mt-4">ORHC Secure Communication</p>
+            <Scale size={120} className="text-[#1a3a32]" />
+            <p className="font-serif italic text-xl mt-4">Registry Secure Correspondence</p>
           </div>
         )}
       </div>
@@ -335,41 +338,66 @@ const AdminMessages: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
-              <h2 className="text-xl font-serif font-bold text-[#355E3B]">New Correspondence</h2>
-              <button onClick={() => { setIsBroadcastModalOpen(false); setRecipientSearch(""); }} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+              <h2 className="text-xl font-serif font-bold text-[#1a3a32]">New Correspondence</h2>
+              <button onClick={() => setIsBroadcastModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
             </div>
             
             <div className="p-6 overflow-y-auto space-y-6">
-               <button onClick={() => { setIsGlobalBroadcast(!isGlobalBroadcast); setSelectedRecipients([]); }} className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between ${isGlobalBroadcast ? "border-[#EFBF04] bg-[#355E3B] text-white" : "border-slate-100 bg-slate-50 text-slate-600"}`}>
-                <div className="flex items-center gap-3"><Megaphone size={20} /><p className="font-bold text-sm">Public Broadcast (All Users)</p></div>
-                {isGlobalBroadcast && <Check size={20} className="text-[#EFBF04]" />}
-              </button>
+              {/* Type Selection */}
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => { setIsGlobalBroadcast(true); setSelectedRecipients([]); }} 
+                  className={`flex-1 p-4 rounded-2xl border-2 transition-all text-center ${isGlobalBroadcast ? "border-[#c2a336] bg-[#1a3a32] text-white" : "border-slate-100 bg-slate-50 text-slate-600"}`}
+                >
+                  <Megaphone size={20} className="mx-auto mb-2" />
+                  <p className="font-bold text-xs uppercase">Broadcast</p>
+                </button>
+                <button 
+                  onClick={() => setIsGlobalBroadcast(false)} 
+                  className={`flex-1 p-4 rounded-2xl border-2 transition-all text-center ${!isGlobalBroadcast ? "border-[#c2a336] bg-[#1a3a32] text-white" : "border-slate-100 bg-slate-50 text-slate-600"}`}
+                >
+                  <Plus size={20} className="mx-auto mb-2" />
+                  <p className="font-bold text-xs uppercase">Direct Select</p>
+                </button>
+              </div>
 
-              {!isGlobalBroadcast && (
-                <div className="space-y-4">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Filter Recipients by Cohort</label>
-                    <div className="flex flex-wrap gap-1.5">
-                      <button onClick={() => setModalCohortFilter("all")} className={`px-3 py-1 rounded-md text-[10px] font-bold border transition-all ${modalCohortFilter === "all" ? "bg-[#355E3B] text-white border-[#355E3B]" : "bg-white text-slate-400 border-slate-200"}`}>ALL</button>
-                      {availableCohorts.map(c => (
-                        <button key={c} onClick={() => setModalCohortFilter(c)} className={`px-3 py-1 rounded-md text-[10px] font-bold border transition-all ${modalCohortFilter === c ? "bg-[#EFBF04] text-[#355E3B] border-[#EFBF04]" : "bg-white text-slate-400 border-slate-200"}`}>COHORT {c}</button>
-                      ))}
+              {isGlobalBroadcast ? (
+                <div className="p-4 bg-slate-100 rounded-2xl space-y-3">
+                  <label className="text-[10px] font-black uppercase text-slate-500">Target Audience</label>
+                  <div className="flex gap-2">
+                    {(["ALL", "JUDGES", "DR"] as MessageAudience[]).map((aud) => (
+                      <button key={aud} onClick={() => setBroadcastAudience(aud)} className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${broadcastAudience === aud ? "bg-[#c2a336] text-[#1a3a32] shadow-sm" : "bg-white text-slate-400"}`}>
+                        {aud}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4 animate-in slide-in-from-top-2">
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                      <input type="text" placeholder="Search PJ or Name..." value={recipientSearch} onChange={(e) => setRecipientSearch(e.target.value)} className="w-full pl-9 pr-4 py-3 bg-slate-100 rounded-xl text-xs outline-none" />
                     </div>
+                    {/* RESOLVED: Modal Cohort Filter UI */}
+                    <select 
+                      value={modalCohortFilter} 
+                      onChange={(e) => setModalCohortFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
+                      className="bg-slate-100 border-none rounded-xl px-4 py-3 text-xs font-bold text-[#1a3a32] outline-none"
+                    >
+                      <option value="all">All Cohorts</option>
+                      {availableCohorts.map(c => <option key={c} value={c}>Cohort {c}</option>)}
+                    </select>
                   </div>
 
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                    <input type="text" placeholder="Search by name or PJ..." value={recipientSearch} onChange={(e) => setRecipientSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-100 rounded-lg text-xs outline-none focus:ring-1 ring-[#355E3B]/20" />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                     {filteredRecipientOptions.map(u => (
-                      <button key={u._id} onClick={() => setSelectedRecipients(prev => prev.includes(u._id) ? prev.filter(x => x !== u._id) : [...prev, u._id])} className={`p-3 text-left text-xs rounded-xl border transition-all flex justify-between items-center ${selectedRecipients.includes(u._id) ? "border-[#355E3B] bg-emerald-50 text-[#355E3B]" : "border-slate-100 hover:bg-slate-50"}`}>
-                        <div>
-                          <p className="font-bold">{u.name}</p>
-                          <p className="text-[9px] opacity-70 uppercase">PJ: {u.pj} • C{u.cohort}</p>
+                      <button key={u._id} onClick={() => setSelectedRecipients(prev => prev.includes(u._id) ? prev.filter(x => x !== u._id) : [...prev, u._id])} className={`p-3 text-left text-xs rounded-xl border transition-all flex justify-between items-center ${selectedRecipients.includes(u._id) ? "border-[#c2a336] bg-[#1a3a32] text-white" : "border-slate-100 hover:bg-slate-50"}`}>
+                        <div className="overflow-hidden">
+                          <p className="font-bold truncate">{u.name}</p>
+                          <p className={`text-[9px] uppercase ${selectedRecipients.includes(u._id) ? "text-[#c2a336]" : "text-slate-400"}`}>PJ: {u.pj} • {u.role}</p>
                         </div>
-                        {selectedRecipients.includes(u._id) && <Check size={14} />}
+                        {selectedRecipients.includes(u._id) && <Check size={14} className="text-[#c2a336]" />}
                       </button>
                     ))}
                   </div>
@@ -377,14 +405,14 @@ const AdminMessages: React.FC = () => {
               )}
               
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400">Official Message</label>
-                <textarea value={broadcastMessage} onChange={(e) => setBroadcastMessage(e.target.value)} placeholder="Type your message..." className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm focus:border-[#355E3B] outline-none" rows={4} />
+                <label className="text-[10px] font-black uppercase text-slate-400">Official Correspondence</label>
+                <textarea value={broadcastMessage} onChange={(e) => setBroadcastMessage(e.target.value)} placeholder="Type the registry briefing here..." className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm outline-none focus:ring-2 ring-[#1a3a32]/5 transition-all" rows={4} />
               </div>
             </div>
 
             <div className="p-6 bg-slate-50 border-t flex justify-end gap-4">
-              <button onClick={() => setIsBroadcastModalOpen(false)} className="text-slate-500 font-bold px-4 text-sm hover:text-slate-700 transition-colors">Cancel</button>
-              <button onClick={handleBroadcastSubmit} disabled={!isGlobalBroadcast && selectedRecipients.length === 0} className="bg-[#355E3B] text-white px-8 py-3 rounded-2xl font-bold shadow-lg hover:bg-[#2a4b2f] disabled:opacity-50 transition-all">Dispatch Correspondence</button>
+              <button onClick={() => setIsBroadcastModalOpen(false)} className="text-slate-500 font-bold px-4 text-sm hover:text-slate-700">Discard</button>
+              <button onClick={handleBroadcastSubmit} disabled={sending || (!isGlobalBroadcast && selectedRecipients.length === 0)} className="bg-[#1a3a32] text-white px-10 py-3.5 rounded-2xl font-bold hover:bg-[#122923] shadow-lg shadow-[#1a3a32]/20 disabled:opacity-50 transition-all uppercase text-xs tracking-widest">Dispatch</button>
             </div>
           </div>
         </div>

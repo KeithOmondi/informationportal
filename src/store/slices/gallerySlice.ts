@@ -1,13 +1,18 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
 import { api } from "../../api/axios";
 
+// -------------------- TYPES --------------------
+
+export type AudienceRole = "judge" | "dr" | "all";
+
 export interface IGallery {
   _id: string;
   description: string;
   url: string;
   downloadUrl: string;
   resourceType: "image" | "video";
-  downloadCount: number; // ← Added for tracking
+  targetAudience: AudienceRole;
+  downloadCount: number;
   uploadedBy?: {
     _id: string;
     name: string;
@@ -35,7 +40,7 @@ export const fetchGallery = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const res = await api.get(`/gallery/get`);
-      return res.data;
+      return res.data.data || res.data;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || "Failed to fetch gallery");
     }
@@ -47,7 +52,7 @@ export const fetchGalleryAdmin = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const res = await api.get(`/gallery/admin`);
-      return res.data;
+      return res.data.data || res.data;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || "Failed to fetch admin gallery");
     }
@@ -68,6 +73,19 @@ export const uploadMedia = createAsyncThunk(
   }
 );
 
+// --- NEW: Bulk Update Thunk ---
+export const updateAudienceBulk = createAsyncThunk(
+  "gallery/updateAudienceBulk",
+  async ({ ids, targetAudience }: { ids: string[]; targetAudience: AudienceRole }, { rejectWithValue }) => {
+    try {
+      await api.patch(`/gallery/bulk-audience`, { ids, targetAudience });
+      return { ids, targetAudience };
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || "Failed to update audience");
+    }
+  }
+);
+
 export const deleteMedia = createAsyncThunk(
   "gallery/deleteMedia",
   async (id: string, { rejectWithValue }) => {
@@ -81,6 +99,7 @@ export const deleteMedia = createAsyncThunk(
 );
 
 // -------------------- SLICE --------------------
+
 const gallerySlice = createSlice({
   name: "gallery",
   initialState,
@@ -93,7 +112,6 @@ const gallerySlice = createSlice({
       state.loading = false;
       state.error = null;
     },
-    // --- Added: Optimistic UI update for downloads ---
     locallyIncrementGalleryDownload(state, action: PayloadAction<string>) {
       const item = state.items.find((m) => m._id === action.payload);
       if (item) {
@@ -114,18 +132,31 @@ const gallerySlice = createSlice({
       })
 
       // DELETE
-      .addCase(deleteMedia.pending, (state) => { 
-        state.loading = true; 
-        state.error = null; 
-      })
       .addCase(deleteMedia.fulfilled, (state, action: PayloadAction<string>) => {
         state.loading = false;
-        state.items = state.items.filter((item: IGallery) => item._id !== action.payload);
+        state.items = state.items.filter((item) => item._id !== action.payload);
       })
 
-      // FETCH & ADMIN FETCH MATCHERS
+      // --- NEW: Handle Bulk Update Success ---
+      .addCase(updateAudienceBulk.fulfilled, (state, action) => {
+        state.loading = false;
+        const { ids, targetAudience } = action.payload;
+        // Efficiently update only the changed items in the state
+        state.items = state.items.map((item) => 
+          ids.includes(item._id) 
+            ? { ...item, targetAudience } 
+            : item
+        );
+      })
+
+      // FETCH MATCHERS
       .addMatcher(
-        (action) => [fetchGallery.pending.type, fetchGalleryAdmin.pending.type].includes(action.type),
+        (action) => [
+          fetchGallery.pending.type, 
+          fetchGalleryAdmin.pending.type,
+          deleteMedia.pending.type,
+          updateAudienceBulk.pending.type // Added pending state for update
+        ].includes(action.type),
         (state) => { 
           state.loading = true; 
           state.error = null; 
@@ -138,7 +169,7 @@ const gallerySlice = createSlice({
           state.items = action.payload; 
         }
       )
-      // REJECTED GLOBAL HANDLER
+      // GLOBAL REJECTED HANDLER
       .addMatcher(
         (action) => action.type.endsWith("/rejected"),
         (state, action: any) => {
@@ -149,5 +180,10 @@ const gallerySlice = createSlice({
   },
 });
 
-export const { clearGalleryError, resetGallery, locallyIncrementGalleryDownload } = gallerySlice.actions;
+export const { 
+  clearGalleryError, 
+  resetGallery, 
+  locallyIncrementGalleryDownload 
+} = gallerySlice.actions;
+
 export default gallerySlice.reducer;

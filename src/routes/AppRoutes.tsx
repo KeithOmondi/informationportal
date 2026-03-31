@@ -24,12 +24,23 @@ import AdminUsers from "../pages/admin/AdminUsers";
 import AdminGallery from "../pages/admin/AdminGallary";
 import JudgeGallery from "../pages/judge/JudgesGallary";
 import JudgeMessagePage from "../pages/judge/JudgeMessage";
+import DrLayout from "../components/dr/DrLayout";
+import DrDashboard from "../pages/dr/DrDashboard";
+import DrPasswordSetup from "../components/Login/DrPasswordSetup";
+import DrNotices from "../pages/dr/DrNotices";
+import DrCinfo from "../pages/dr/DrCinfo";
+import DrDocs from "../pages/dr/DrDocs";
+import DrEvents from "../pages/dr/DrEvents";
+import AdminProgram from "../pages/admin/AdminProgram";
+import DrProgramme from "../pages/dr/DrProgramme";
+import DrGallery from "../pages/dr/DrGallery";
 
 export default function AppRoutes() {
   return (
     <Routes>
       {/* 1. PUBLIC ROUTES */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/setup-password" element={<DrPasswordSetup />} />
 
       {/* 2. ADMIN ROUTES */}
       <Route
@@ -49,6 +60,7 @@ export default function AppRoutes() {
         <Route path="documents" element={<AdminOath />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="gallery" element={<AdminGallery />} />
+        <Route path="program" element={<AdminProgram />} />
         {/* Default redirect for /admin */}
         <Route index element={<Navigate to="dashboard" replace />} />
       </Route>
@@ -70,6 +82,27 @@ export default function AppRoutes() {
         <Route path="events" element={<JudgeEventsPage />} />
         <Route path="documents" element={<JudgesReligion />} />
         <Route path="gallery" element={<JudgeGallery />} />
+
+        {/* Default redirect for /judge */}
+        <Route index element={<Navigate to="dashboard" replace />} />
+      </Route>
+
+      <Route
+        path="/dr"
+        element={
+          <ProtectedRoute allowedRoles={["dr"]}>
+            <DrLayout /> {/* Make sure JudgeLayout has <Outlet /> */}
+          </ProtectedRoute>
+        }
+      >
+        <Route path="dashboard" element={<DrDashboard />} />
+        <Route path="notice" element={<DrNotices />} />
+        <Route path="information" element={<DrCinfo />} />
+        <Route path="documents" element={<DrDocs />} />
+        <Route path="events" element={<DrEvents />} />
+        <Route path="programme" element={<DrProgramme />} />
+        <Route path="gallery" element={<DrGallery />} />
+        
 
         {/* Default redirect for /judge */}
         <Route index element={<Navigate to="dashboard" replace />} />

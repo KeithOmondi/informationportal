@@ -13,7 +13,7 @@ export interface User {
   _id: string;
   name: string;
   email: string;
-  role?: string;
+  role: "admin" | "judge" | "dr"; // Updated to include DR
 }
 
 export interface Message {
@@ -23,9 +23,10 @@ export interface Message {
   group?: string;
   text?: string;
   imageUrl?: string;
-  senderType: "admin" | "judge" | "guest";
+  senderType: "admin" | "judge" | "dr"; // Updated
   isBroadcast?: boolean;
-  readBy: string[]; // Now the source of truth for "read" status
+  audience?: "JUDGES" | "DR" | "ALL"; // Matches backend scoping
+  readBy: string[];
   isEdited?: boolean;
   isDeleted?: boolean;
   createdAt: string;
@@ -41,7 +42,7 @@ export interface Group {
   createdAt: string;
   isReadOnly?: boolean;
   type?: "group" | "broadcast" | "private";
-  unreadCount?: number; // Added to support sidebar badges
+  unreadCount?: number;
 }
 
 interface UserChatState {
@@ -63,16 +64,19 @@ const initialState: UserChatState = {
 // ==========================
 
 /**
- * Marks an entire thread as read on the server.
- * Dispatch this when a user clicks on a channel.
+ * Marks thread as read. 
+ * Endpoint matches markThreadAsRead in controller.
  */
 export const markThreadAsRead = createAsyncThunk<
   { channelId: string },
-  { channelId: string; type: "broadcast" | "private" | "group" }
+  { type: "broadcast" | "private" }
 >("userChat/markThreadAsRead", async (payload, { rejectWithValue }) => {
   try {
+    // Your controller uses req.body { type }
     await api.patch("/chat/read-thread", payload);
-    return { channelId: payload.channelId };
+    // We map types to the virtual IDs used in the sidebar
+    const channelId = payload.type === "broadcast" ? "global_broadcast" : "admin_private";
+    return { channelId };
   } catch (err: any) {
     return rejectWithValue(err.response?.data?.message || "Failed to mark as read");
   }
@@ -83,9 +87,9 @@ export const fetchUserMessages = createAsyncThunk<
   { receiver?: string; group?: string; isBroadcast?: boolean }
 >("userChat/fetchUserMessages", async (params, { rejectWithValue }) => {
   try {
-    // Note: Updated to match your general message fetching endpoint
     const { data } = await api.get("/chat/messages", { params });
-    return data;
+    // Note: Controller returns { success: true, data: [...] }
+    return data.data; 
   } catch (err: any) {
     return rejectWithValue(err.response?.data?.message || "Failed to fetch messages");
   }
@@ -96,7 +100,8 @@ export const fetchUserGroups = createAsyncThunk<Group[]>(
   async (_, { rejectWithValue }) => {
     try {
       const { data } = await api.get("/chat/my-groups");
-      return data;
+       // Note: Controller returns { success: true, data: [...] }
+      return data.data;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || "Groups fetch failed");
     }
@@ -117,7 +122,7 @@ const userChatSlice = createSlice({
       if (!exists) {
         state.chatMessages.push(action.payload);
 
-        // UI Logic: Find the group/channel this message belongs to and increment its unread count
+        // Map incoming message to the correct sidebar channel badge
         const channelId = action.payload.isBroadcast 
           ? "global_broadcast" 
           : "admin_private";
@@ -136,19 +141,18 @@ const userChatSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchUserMessages.fulfilled, (state, action) => {
-        state.chatMessages = Array.isArray(action.payload) ? action.payload : [];
+        state.chatMessages = action.payload;
       })
       .addCase(fetchUserGroups.fulfilled, (state, action) => {
         state.groups = action.payload;
       })
       .addCase(markThreadAsRead.fulfilled, (state, action) => {
-        // Find the channel in state and reset its unread count to 0 locally
         const group = state.groups.find(g => g._id === action.payload.channelId);
         if (group) {
           group.unreadCount = 0;
         }
       })
-      /* Matchers for Loading/Error States */
+      /* Matchers */
       .addMatcher(
         (action: Action): action is Action => action.type.endsWith("/pending"),
         (state) => {
@@ -157,13 +161,10 @@ const userChatSlice = createSlice({
         },
       )
       .addMatcher(
-        (action: Action): action is PayloadAction<string> =>
-          action.type.endsWith("/rejected"),
+        (action: Action): action is PayloadAction<string> => action.type.endsWith("/rejected"),
         (state, action) => {
           state.loading = false;
-          state.error = typeof action.payload === "string" 
-            ? action.payload 
-            : "An unexpected error occurred";
+          state.error = typeof action.payload === "string" ? action.payload : "Error";
         },
       )
       .addMatcher(

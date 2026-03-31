@@ -55,14 +55,18 @@ const JudgeSidebar = ({ isOpen, setIsOpen }: JudgeSidebarProps) => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
+  /* ===========================
+      UPDATED LOGOUT HANDLER
+  =========================== */
   const handleLogout = async () => {
     try {
-      // The Matcher in authSlice clears local state immediately
-      await dispatch(logoutUser()).unwrap();
+      // Pass 'false' for the allDevices argument as per your new Slice definition
+      await dispatch(logoutUser(false)).unwrap();
       setIsOpen(false);
       navigate("/login");
     } catch (error) {
-      // Even if server fails, user is logged out locally
+      // The slice's .addMatcher clears state locally even on server error
+      setIsOpen(false);
       navigate("/login");
     }
   };

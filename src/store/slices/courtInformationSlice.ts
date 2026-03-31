@@ -4,6 +4,7 @@ import { api } from "../../api/axios";
 // ----------------- TYPES -----------------
 
 export type ContentType = "TEXT" | "IMAGE" | "VIDEO" | "FILE";
+export type AudienceRole = "judge" | "dr" | "all";
 
 export interface DivisionContent {
   _id: string;
@@ -19,10 +20,11 @@ export interface DivisionContent {
 export interface Division {
   _id: string;
   name: string;
-  title: string; 
+  title: string;
   description?: string;
-  order: number; // Required for sorting logic
+  order: number;
   content: DivisionContent[];
+  targetAudience: AudienceRole;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +33,7 @@ export interface FAQ {
   _id: string;
   question: string;
   answer: string;
+  targetAudience: AudienceRole;
 }
 
 export interface Contact {
@@ -38,6 +41,7 @@ export interface Contact {
   title: string;
   detail: string;
   sub?: string;
+  targetAudience: AudienceRole;
 }
 
 interface CourtState {
@@ -67,7 +71,7 @@ export const fetchCourtInfo = createAsyncThunk(
   "court/fetchCourtInfo",
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await api.get("/courts/get");
+      const { data } = await api.get("/courts/all");
       return data;
     } catch (err: any) {
       return rejectWithValue(getErrorMessage(err, "Failed to fetch court info"));
@@ -205,20 +209,21 @@ const courtSlice = createSlice({
       /* FETCH ALL */
       .addCase(fetchCourtInfo.fulfilled, (state, action) => {
         state.loading = false;
-        state.divisions = action.payload.divisions || [];
-        state.faqs = action.payload.faqs || [];
-        state.contacts = action.payload.contacts || [];
+        // Check if data is nested under a property or returned directly
+        const source = action.payload?.data || action.payload;
+        
+        state.divisions = source.divisions || [];
+        state.faqs = source.faqs || [];
+        state.contacts = source.contacts || [];
       })
 
       /* DIVISIONS */
       .addCase(createDivision.fulfilled, (state, action: PayloadAction<Division>) => {
         state.divisions.push(action.payload);
-        // Ensure list stays sorted after adding new item at the bottom
         state.divisions.sort((a, b) => (a.order || 0) - (b.order || 0));
         state.loading = false;
       })
       .addCase(updateDivision.fulfilled, (state, action: PayloadAction<any>) => {
-        // Handle swap logic (returns full list) or standard update (returns single object)
         if (action.payload.divisions) {
           state.divisions = action.payload.divisions;
         } else {
@@ -227,7 +232,6 @@ const courtSlice = createSlice({
             state.divisions[idx] = action.payload;
           }
         }
-        // Always maintain order
         state.divisions.sort((a, b) => (a.order || 0) - (b.order || 0));
         state.loading = false;
       })

@@ -2,9 +2,8 @@ import { useEffect, useMemo } from "react";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { fetchNotices } from "../../store/slices/noticeSlice";
 import { fetchEvents } from "../../store/slices/eventSlice";
-import { fetchUserGroups, fetchUserMessages } from "../../store/slices/userChatSlice";
 import { fetchCeremonyInfo } from "../../store/slices/swearingPreferenceSlice";
-
+import { fetchGalleryAdmin } from "../../store/slices/gallerySlice"; // IMPORTED
 import {
   FileText,
   Calendar,
@@ -17,8 +16,8 @@ import {
   ShieldCheck,
   History,
   Unlock,
-  Users,
   Presentation as PresentationIcon,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { type INotice } from "../../store/slices/noticeSlice";
@@ -74,27 +73,30 @@ const StatCard = ({
   </div>
 );
 
-const JudgeDashboardPage = () => {
+const DrDashboard = () => {
   const dispatch = useAppDispatch();
 
   // Selectors
   const { user } = useAppSelector((state) => state.auth);
   const { notices, loading: noticesLoading } = useAppSelector((state) => state.notices);
   const { events, loading: eventsLoading } = useAppSelector((state) => state.events);
-  const { groups, loading: chatLoading } = useAppSelector((state) => state.userChat);
   const { judges, presentations, loading: ceremonyLoading } = useAppSelector((state) => state.ceremony);
+  
+  // FIXED: Select gallery items and loading state from gallerySlice
+  const { items: galleryItems, loading: galleryLoading } = useAppSelector((state) => state.gallery);
+  const galleryCount = galleryItems?.length || 0;
 
   /* -------------------- DATA FETCHING -------------------- */
   useEffect(() => {
     dispatch(fetchNotices(undefined));
     dispatch(fetchEvents({ filter: "ALL" }));
-    dispatch(fetchUserGroups());
-    dispatch(fetchUserMessages({}));
     dispatch(fetchCeremonyInfo());
+    dispatch(fetchGalleryAdmin()); // FETCH GALLERY DATA
 
     const refreshInterval = setInterval(() => {
       dispatch(fetchEvents({ filter: "ALL" }));
       dispatch(fetchCeremonyInfo());
+      dispatch(fetchGalleryAdmin());
     }, 60000); 
 
     return () => clearInterval(refreshInterval);
@@ -118,8 +120,10 @@ const JudgeDashboardPage = () => {
   const activeNotices = useMemo(() => {
     const now = new Date();
     return (notices || []).filter((notice: INotice) => {
-      if (!notice.expiryDate) return notice.isActive;
-      return notice.isActive && new Date(notice.expiryDate) >= now;
+      const isDRTargeted = notice.targetAudience === "DR" || notice.targetAudience === "ALL";
+      if (!notice.isActive || !isDRTargeted) return false;
+      if (!notice.expiryDate) return true;
+      return new Date(notice.expiryDate) >= now;
     });
   }, [notices]);
 
@@ -137,21 +141,13 @@ const JudgeDashboardPage = () => {
       .slice(0, 5);
   }, [activeNotices]);
 
-  const messageStats = useMemo(() => {
-    const unread = (groups || []).reduce((acc, group) => acc + (group.unreadCount || 0), 0);
-    return { unread, totalChannels: groups.length };
-  }, [groups]);
-
   const displayEvent = useMemo(() => {
     if (!events || events.length === 0) return null;
     const ongoing = events.find(e => e.status === "ONGOING");
     if (ongoing) return ongoing;
-
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-
     const validEvents = events.filter(e => new Date(e.endDate) >= now);
-
     return [...validEvents].sort((a, b) => {
       if (a.isMandatory && !b.isMandatory) return -1;
       if (!a.isMandatory && b.isMandatory) return 1;
@@ -160,7 +156,7 @@ const JudgeDashboardPage = () => {
   }, [events]);
 
   const isOngoing = displayEvent?.status === "ONGOING";
-  const displayName = user?.name || "Justice";
+  const displayName = user?.name || "Registrar";
   const startDate = displayEvent ? new Date(displayEvent.startDate) : null;
   const endDate = displayEvent ? new Date(displayEvent.endDate) : null;
   const isMultiDay = startDate && endDate && startDate.toDateString() !== endDate.toDateString();
@@ -169,7 +165,6 @@ const JudgeDashboardPage = () => {
     return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  // Logic for the New "Ceremony Resources" Card
   const totalResources = (judges?.length || 0) + (presentations?.length || 0);
 
   return (
@@ -180,13 +175,12 @@ const JudgeDashboardPage = () => {
         <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-6 gap-4">
           <div className="space-y-2">
             <h1 className="text-3xl md:text-4xl font-serif text-[#355E3B] font-black">
-              Welcome, <span className="capitalize">Judge {displayName}</span>
+              Welcome, <span className="capitalize">DR. {displayName}</span>
             </h1>
-            
             <div className="flex flex-wrap items-center gap-4 text-slate-500">
                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold uppercase tracking-wider border border-slate-200">
                   <ShieldCheck size={12} className="text-[#355E3B]" />
-                  Secure Session
+                  Registrar Access
                </div>
                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">
                   <History size={12} className="text-[#C5A059]" />
@@ -194,7 +188,6 @@ const JudgeDashboardPage = () => {
                </div>
             </div>
           </div>
-          
           <div className="text-left hidden md:block">
             <p className="text-[10px] font-bold text-slate-400 uppercase">Current Session</p>
             <p className="text-sm font-serif font-bold text-[#355E3B]">
@@ -205,42 +198,44 @@ const JudgeDashboardPage = () => {
 
         {/* STATS ROW */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          <Link to="/judge/notices">
+          <Link to="/dr/notice">
             <StatCard
-              title="Notices"
+              title="Registry Notices"
               value={activeNotices.length}
-              subtext={urgentNoticesCount > 0 ? `${urgentNoticesCount} Priority Action` : "Notices Overview"}
+              subtext={urgentNoticesCount > 0 ? `${urgentNoticesCount} Pending Actions` : "Admin Overview"}
               loading={noticesLoading && notices.length === 0}
               urgent={urgentNoticesCount > 0}
             />
           </Link>
 
-          <Link to="/judge/messages">
+          {/* FIXED GALLERY CARD */}
+          <Link to="/dr/gallery">
             <StatCard
-              title="Messages"
-              value={messageStats.unread}
-              subtext={messageStats.unread > 0 ? `${messageStats.unread} New Alerts` : "No pending message"}
-              loading={chatLoading && groups.length === 0}
-              urgent={messageStats.unread > 0}
+              title="Media Gallery"
+              value={galleryCount}
+              subtext="Registry Archive"
+              loading={galleryLoading}
+              urgent={false}
+              locked={galleryCount === 0}
             />
           </Link>
 
-          <Link to="/judge/events">
+          <Link to="/dr/events">
             <StatCard
-              title="Events"
+              title="Events Calendar"
               value={events.length}
-              subtext="High Court Calendar"
+              subtext="Institutional Schedule"
               loading={eventsLoading && events.length === 0}
               showBadge={hasNewEvent}
-              badgeText="NEW EVENT"
+              badgeText="EVENT UPDATE"
             />
           </Link>
 
-          <Link to="/judge/documents">
+          <Link to="/dr/programme">
             <StatCard
-              title="Resources"
+              title="Programme & Files"
               value={totalResources}
-              subtext={`${presentations.length} Files | ${judges.length} Bios`}
+              subtext={`${judges?.length || 0} Judicial Profiles`}
               loading={ceremonyLoading && totalResources === 0}
               urgent={totalResources > 0}
               locked={totalResources === 0}
@@ -257,18 +252,13 @@ const JudgeDashboardPage = () => {
               <div className="flex items-center gap-3">
                 {isOngoing ? <Activity className="text-red-600 animate-pulse" size={22} /> : <Calendar className="text-[#C5A059]" size={22} />}
                 <h2 className="text-[#355E3B] font-serif text-2xl font-black">
-                  {isOngoing ? "Ongoing Event" : "Upcoming Event"}
+                  {isOngoing ? "Active Proceedings" : "Upcoming Event"}
                 </h2>
               </div>
-
               {hasNewEvent && (
-                <Link to="/judge/events" className="hidden sm:flex items-center gap-2 bg-[#355E3B] text-[#C5A059] px-3 py-1.5 rounded-sm border border-[#C5A059]/30 hover:bg-[#2a4b2f] transition-all group">
-                   <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#C5A059] opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C5A059]"></span>
-                  </span>
-                  <span className="text-[10px] font-black uppercase tracking-widest">Update Available</span>
-                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                <Link to="/dr/events" className="hidden sm:flex items-center gap-2 bg-[#355E3B] text-[#C5A059] px-3 py-1.5 rounded-sm border border-[#C5A059]/30 hover:bg-[#2a4b2f] transition-all group">
+                   <span className="text-[10px] font-black uppercase tracking-widest">Update Registry</span>
+                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </Link>
               )}
             </div>
@@ -276,7 +266,7 @@ const JudgeDashboardPage = () => {
             {eventsLoading && events.length === 0 ? (
               <div className="py-20 flex flex-col items-center justify-center text-slate-400">
                 <Loader2 className="animate-spin mb-4" size={32} />
-                <p className="text-[10px] font-black uppercase tracking-widest">Accessing Judicial Registry...</p>
+                <p className="text-[10px] font-black uppercase tracking-widest">Accessing Registry Logs...</p>
               </div>
             ) : displayEvent && startDate && endDate ? (
               <div className="flex flex-col md:flex-row gap-8 items-start mb-4 animate-in fade-in duration-500">
@@ -307,7 +297,7 @@ const JudgeDashboardPage = () => {
                           <Clock size={14} />
                         </div>
                         <div>
-                          <p className="text-[9px] uppercase font-black text-slate-400">Commencement</p>
+                          <p className="text-[9px] uppercase font-black text-slate-400">Registry Start</p>
                           <p className="text-xs font-bold text-slate-700">{formatDateLabel(startDate)}</p>
                         </div>
                       </div>
@@ -316,24 +306,23 @@ const JudgeDashboardPage = () => {
                           <ArrowRight size={14} />
                         </div>
                         <div>
-                          <p className="text-[9px] uppercase font-black text-slate-400">Conclusion</p>
+                          <p className="text-[9px] uppercase font-black text-slate-400">End Time</p>
                           <p className="text-xs font-bold text-slate-700">{formatDateLabel(endDate)}</p>
                         </div>
                       </div>
                     </div>
                   </div>
-
                   <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
                     <div className="flex items-start gap-3">
                         <MapPin size={18} className="text-[#C5A059] shrink-0" />
                         <div>
-                          <p className="text-[10px] uppercase font-bold text-slate-400">Venue</p>
+                          <p className="text-[10px] uppercase font-bold text-slate-400">Designated Venue</p>
                           <p className="font-bold text-sm text-slate-700">{displayEvent.location || "TBD"}</p>
                         </div>
                     </div>
                     {displayEvent.isMandatory && (
                       <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 px-3 py-1 rounded-sm font-bold text-[9px] uppercase tracking-tighter">
-                         <Activity size={14} /> Mandatory Appearance
+                         <Activity size={14} /> Registrar Oversight Req.
                       </div>
                     )}
                   </div>
@@ -342,28 +331,28 @@ const JudgeDashboardPage = () => {
             ) : (
               <div className="py-16 text-center border border-dashed border-slate-200 rounded-sm bg-slate-50/50">
                 <Calendar className="mx-auto text-slate-300 mb-4" size={40} />
-                <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No active assignments</p>
+                <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No pending assignments</p>
               </div>
             )}
 
-            {/* Quick Access to Resources */}
+            {/* Quick Access */}
             <div className="mt-8 pt-6 border-t border-slate-100 grid grid-cols-2 gap-4">
-               <Link to="/judge/documents" className="flex items-center gap-3 p-3 bg-slate-50 rounded hover:bg-slate-100 transition-all border border-slate-200/50">
+               <Link to="/dr/gallery" className="flex items-center gap-3 p-3 bg-slate-50 rounded hover:bg-slate-100 transition-all border border-slate-200/50">
                   <div className="p-2 bg-[#355E3B] text-[#C5A059] rounded">
-                    <Users size={16} />
+                    <ImageIcon size={16} />
                   </div>
                   <div>
-                    <p className="text-[9px] font-black text-slate-400 uppercase">Profiles</p>
-                    <p className="text-xs font-bold text-[#355E3B]">{judges.length} Judges</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase">Gallery</p>
+                    <p className="text-xs font-bold text-[#355E3B]">View Gallery</p>
                   </div>
                </Link>
-               <Link to="/judge/documents" className="flex items-center gap-3 p-3 bg-slate-50 rounded hover:bg-slate-100 transition-all border border-slate-200/50">
+               <Link to="/dr/documents" className="flex items-center gap-3 p-3 bg-slate-50 rounded hover:bg-slate-100 transition-all border border-slate-200/50">
                   <div className="p-2 bg-[#C5A059] text-white rounded">
                     <PresentationIcon size={16} />
                   </div>
                   <div>
-                    <p className="text-[9px] font-black text-slate-400 uppercase">Briefings</p>
-                    <p className="text-xs font-bold text-[#355E3B]">{presentations.length} Documents</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase">Documents</p>
+                    <p className="text-xs font-bold text-[#355E3B]">{presentations?.length || 0} Files</p>
                   </div>
                </Link>
             </div>
@@ -375,7 +364,6 @@ const JudgeDashboardPage = () => {
               <FileText className="text-[#C5A059]" size={20} />
               <h2 className="text-[#355E3B] font-serif text-xl font-black">Recent Notices</h2>
             </div>
-
             <div className="space-y-6 flex-1">
               {sortedNotices.length > 0 ? (
                 sortedNotices.map((notice) => (
@@ -396,14 +384,13 @@ const JudgeDashboardPage = () => {
               ) : (
                 <div className="py-10 text-center">
                   <p className="text-slate-300 text-xs italic font-medium">
-                    {noticesLoading ? "Loading Secure Briefs..." : "No active notices found."}
+                    {noticesLoading ? "Syncing Briefs..." : "Clear Registry."}
                   </p>
                 </div>
               )}
             </div>
-            
-            <Link to="/judge/notices" className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#355E3B] hover:text-[#C5A059] transition-all group">
-              View All Notices <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            <Link to="/dr/notice" className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#355E3B] hover:text-[#C5A059] transition-all group">
+              Audit Notices <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
         </div>
@@ -412,4 +399,4 @@ const JudgeDashboardPage = () => {
   );
 };
 
-export default JudgeDashboardPage;
+export default DrDashboard;

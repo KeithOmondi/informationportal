@@ -8,11 +8,13 @@ import { api } from "../../api/axios";
 // ==========================
 // Types
 // ==========================
+export type MessageAudience = "JUDGES" | "DR" | "ALL";
+
 export interface User {
   _id: string;
   name: string;
   email: string;
-  role?: string;
+  role: "admin" | "judge" | "dr";
   isActive: boolean;
 }
 
@@ -23,12 +25,12 @@ export interface Message {
   group?: string;
   text?: string;
   imageUrl?: string;
-  senderType: "admin" | "user" | "judge";
+  senderType: "admin" | "judge" | "dr";
   readBy: string[];
-  status: "sent" | "delivered" | "read";
+  isBroadcast?: boolean;
+  audience?: MessageAudience;
   isEdited?: boolean;
   isDeleted?: boolean;
-  isBroadcast?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,13 +46,13 @@ export interface Group {
 }
 
 interface AdminChatState {
-  messages: Message[];      // System-wide logs
-  chatMessages: Message[];  // Active thread messages
-  unreadCount: number;      // Tracking for Header notifications
+  messages: Message[];
+  chatMessages: Message[];
+  unreadCount: number;
   groups: Group[];
   stats: Record<string, any>;
   loading: boolean;
-  sending: boolean;         // Specific state for message sending
+  sending: boolean;
   error?: string;
   totalMessages: number;
   page: number;
@@ -76,11 +78,11 @@ const initialState: AdminChatState = {
 // ==========================
 
 export const fetchAllMessages = createAsyncThunk<
-  { messages: Message[]; total: number; page: number; pages: number },
+  { success: boolean; data: Message[] }, 
   { page?: number; limit?: number; isBroadcast?: boolean; receiverId?: string }
 >("adminChat/fetchAllMessages", async (params, { rejectWithValue }) => {
   try {
-    const { data } = await api.get("/chat/admin/messages", { params });
+    const { data } = await api.get("/chat/messages", { params });
     return data;
   } catch (err: any) {
     return rejectWithValue(err.response?.data?.message || "Failed to fetch logs");
@@ -88,11 +90,11 @@ export const fetchAllMessages = createAsyncThunk<
 });
 
 export const fetchChatMessages = createAsyncThunk<
-  { messages: Message[]; total: number; page: number; pages: number },
+  { success: boolean; data: Message[] },
   { receiverId?: string; groupId?: string; isBroadcast?: boolean; page?: number; limit?: number }
 >("adminChat/fetchChatMessages", async (params, { rejectWithValue }) => {
   try {
-    const { data } = await api.get("/chat/admin/messages", { params });
+    const { data } = await api.get("/chat/messages", { params });
     return data;
   } catch (err: any) {
     return rejectWithValue(err.response?.data?.message || "Failed to fetch thread");
@@ -107,6 +109,8 @@ export const sendMessage = createAsyncThunk<
     text?: string;
     image?: File;
     isBroadcast?: boolean;
+    audience?: MessageAudience;
+    targetRole?: "judge" | "dr";
     groupId?: string;
   }
 >("adminChat/sendMessage", async (payload, { rejectWithValue }) => {
@@ -117,25 +121,43 @@ export const sendMessage = createAsyncThunk<
 
     if (payload.isBroadcast) {
       formData.append("isBroadcast", "true");
+      formData.append("audience", payload.audience || "ALL");
     } else if (payload.groupId) {
       formData.append("group", payload.groupId);
-    } else if (payload.receivers && payload.receivers.length > 0) {
-      payload.receivers.forEach(id => formData.append("receivers", id));
-    } else if (payload.receiver) {
-      formData.append("receiver", payload.receiver);
     } else {
-      return rejectWithValue("Please select a recipient.");
+      if (payload.targetRole) formData.append("targetRole", payload.targetRole);
+      if (payload.receivers && payload.receivers.length > 0) {
+        payload.receivers.forEach(id => formData.append("receivers", id));
+      } else if (payload.receiver) {
+        formData.append("receiver", payload.receiver);
+      } else {
+        return rejectWithValue("Please select a recipient.");
+      }
     }
 
     const { data } = await api.post("/chat/admin/send", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
-    return data;
+    return data.data;
   } catch (err: any) {
     return rejectWithValue(err.response?.data?.message || "Failed to send message");
   }
 });
 
+// RESTORED: Fetch Stats for AdminDashboard
+export const fetchStats = createAsyncThunk<Record<string, any>>(
+  "adminChat/fetchStats",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/chat/admin/stats");
+      return data;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || "Stats unavailable");
+    }
+  }
+);
+
+// RESTORED: Group Management
 export const fetchAdminGroups = createAsyncThunk<Group[]>(
   "adminChat/fetchGroups",
   async (_, { rejectWithValue }) => {
@@ -172,18 +194,6 @@ export const purgeMessagePermanently = createAsyncThunk(
   }
 );
 
-export const fetchStats = createAsyncThunk<Record<string, any>>(
-  "adminChat/fetchStats",
-  async (_, { rejectWithValue }) => {
-    try {
-      const { data } = await api.get("/chat/admin/stats");
-      return data;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Stats unavailable");
-    }
-  }
-);
-
 // ==========================
 // Slice
 // ==========================
@@ -199,7 +209,6 @@ const adminChatSlice = createSlice({
       state.page = 1;
       state.pages = 1;
     },
-    // RESTORED: Needed by AdminHeader.tsx
     clearUnreadCount: (state) => {
       state.unreadCount = 0;
     },
@@ -210,30 +219,33 @@ const adminChatSlice = createSlice({
       const inThread = state.chatMessages.some((m) => m._id === msg._id);
       if (!inThread) {
         state.chatMessages.push(msg);
-        // Increment unread if message is from a user/judge and not current admin
         if (msg.senderType !== "admin") state.unreadCount += 1;
       }
 
       const inLogs = state.messages.some((m) => m._id === msg._id);
       if (!inLogs) state.messages.unshift(msg);
     },
+    updateMessage: (state, action: PayloadAction<Partial<Message> & { _id: string }>) => {
+      const index = state.chatMessages.findIndex(m => m._id === action.payload._id);
+      if (index !== -1) {
+        state.chatMessages[index] = { ...state.chatMessages[index], ...action.payload };
+      }
+      const logIndex = state.messages.findIndex(m => m._id === action.payload._id);
+      if (logIndex !== -1) {
+        state.messages[logIndex] = { ...state.messages[logIndex], ...action.payload };
+      }
+    }
   },
   extraReducers: (builder) => {
     builder
-      /* 1. SPECIFIC CASES (.addCase) */
       .addCase(fetchAllMessages.fulfilled, (state, action) => {
         state.loading = false;
-        state.messages = action.payload.messages;
-        state.totalMessages = action.payload.total;
-        state.page = action.payload.page;
-        state.pages = action.payload.pages;
+        state.messages = action.payload.data;
+        state.totalMessages = action.payload.data.length;
       })
       .addCase(fetchChatMessages.fulfilled, (state, action) => {
         state.loading = false;
-        state.chatMessages = action.payload.messages;
-        state.totalMessages = action.payload.total;
-        state.page = action.payload.page;
-        state.pages = action.payload.pages;
+        state.chatMessages = action.payload.data;
       })
       .addCase(sendMessage.fulfilled, (state, action) => {
         state.sending = false;
@@ -244,6 +256,10 @@ const adminChatSlice = createSlice({
           }
         });
       })
+      .addCase(fetchStats.fulfilled, (state, action) => {
+        state.loading = false;
+        state.stats = action.payload;
+      })
       .addCase(fetchAdminGroups.fulfilled, (state, action) => {
         state.loading = false;
         state.groups = action.payload;
@@ -253,14 +269,10 @@ const adminChatSlice = createSlice({
         state.groups.unshift(action.payload);
       })
       .addCase(purgeMessagePermanently.fulfilled, (state, action) => {
+        state.loading = false;
         state.chatMessages = state.chatMessages.filter(m => m._id !== action.payload);
         state.messages = state.messages.filter(m => m._id !== action.payload);
       })
-      .addCase(fetchStats.fulfilled, (state, action) => {
-        state.stats = action.payload;
-      })
-
-      /* 2. GENERAL MATCHERS (.addMatcher) */
       .addMatcher(
         (action): action is any => action.type.endsWith("/pending"),
         (state, action) => {
@@ -286,7 +298,8 @@ export const {
   clearError,
   resetChatMessages,
   receiveMessage,
-  clearUnreadCount, // EXPORTED
+  clearUnreadCount,
+  updateMessage,
 } = adminChatSlice.actions;
 
 export default adminChatSlice.reducer;

@@ -1,6 +1,8 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
 import { api } from "../../api/axios";
 
+export type PresentationRole = "judge" | "dr" | "admin" | "all";
+
 export interface Presentation {
   _id: string;
   title: string;
@@ -12,15 +14,16 @@ export interface Presentation {
   mimeType: string;
   fileName: string;
   fileSize: number;
-  downloadCount: number; // ← Added for tracking
+  downloadCount: number;
+  targetAudience: PresentationRole[];
   createdAt: string;
 }
 
 interface PresentationState {
   items: Presentation[];
   loading: boolean;
-  uploading: boolean; 
-  deleting: string | null; 
+  uploading: boolean;
+  deleting: string | null;
   success: boolean;
   error: string | null;
 }
@@ -50,18 +53,48 @@ export const fetchPresentations = createAsyncThunk(
   }
 );
 
+export const fetchPresentationsForAdmin = createAsyncThunk(
+  "presentations/fetchAdmin",
+  async (_, thunkAPI) => {
+    try {
+      const response = await api.get("/presentations/admin");
+      // Handle { success, count, data: [...] }
+      return response.data;
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Failed to load presentations"
+      );
+    }
+  }
+);
+
 export const uploadPresentation = createAsyncThunk(
   "presentations/upload",
   async (formData: FormData, thunkAPI) => {
     try {
       const response = await api.post("/presentations/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 60000, 
+        timeout: 60000,
       });
       return response.data;
     } catch (error: any) {
       return thunkAPI.rejectWithValue(
         error.response?.data?.message || "Upload failed. File might be too large."
+      );
+    }
+  }
+);
+
+// --- NEW: Bulk Update Thunk ---
+export const updatePresentationsBulk = createAsyncThunk(
+  "presentations/updateBulk",
+  async ({ ids, targetAudience }: { ids: string[]; targetAudience: PresentationRole[] }, thunkAPI) => {
+    try {
+      await api.patch("/presentations/bulk-update", { ids, targetAudience });
+      return { ids, targetAudience };
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Bulk update failed"
       );
     }
   }
@@ -91,7 +124,6 @@ const presentationSlice = createSlice({
       state.success = false;
       state.error = null;
     },
-    // Optimistic update for the UI when a user clicks the download link
     locallyIncrementDownload: (state, action: PayloadAction<string>) => {
       const item = state.items.find(p => p._id === action.payload);
       if (item) {
@@ -101,21 +133,24 @@ const presentationSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Fetch
+      // Fetch (user)
       .addCase(fetchPresentations.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(
-        fetchPresentations.fulfilled,
-        (state, action: PayloadAction<Presentation[]>) => {
-          state.loading = false;
-          state.items = action.payload;
-        }
-      )
-      .addCase(fetchPresentations.rejected, (state, action) => {
+      .addCase(fetchPresentations.fulfilled, (state, action: PayloadAction<Presentation[]>) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.items = action.payload;
+      })
+
+      // Fetch (admin)
+      .addCase(fetchPresentationsForAdmin.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchPresentationsForAdmin.fulfilled, (state, action: PayloadAction<{ data: Presentation[] }>) => {
+        state.loading = false;
+        state.items = action.payload.data;
       })
 
       // Upload
@@ -124,18 +159,10 @@ const presentationSlice = createSlice({
         state.success = false;
         state.error = null;
       })
-      .addCase(
-        uploadPresentation.fulfilled,
-        (state, action: PayloadAction<Presentation>) => {
-          state.uploading = false;
-          state.success = true;
-          state.items.unshift(action.payload);
-        }
-      )
-      .addCase(uploadPresentation.rejected, (state, action) => {
+      .addCase(uploadPresentation.fulfilled, (state, action: PayloadAction<Presentation>) => {
         state.uploading = false;
-        state.error = action.payload as string;
-        state.success = false;
+        state.success = true;
+        state.items.unshift(action.payload);
       })
 
       // Delete
@@ -143,19 +170,38 @@ const presentationSlice = createSlice({
         state.deleting = action.meta.arg;
         state.error = null;
       })
-      .addCase(
-        deletePresentation.fulfilled,
-        (state, action: PayloadAction<string>) => {
-          state.deleting = null;
-          state.items = state.items.filter(
-            (item) => item._id !== action.payload
-          );
-        }
-      )
-      .addCase(deletePresentation.rejected, (state, action) => {
+      .addCase(deletePresentation.fulfilled, (state, action: PayloadAction<string>) => {
         state.deleting = null;
-        state.error = action.payload as string;
-      });
+        state.items = state.items.filter((item) => item._id !== action.payload);
+      })
+
+      // --- NEW: Bulk Update Handler ---
+      .addCase(updatePresentationsBulk.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updatePresentationsBulk.fulfilled, (state, action) => {
+        state.loading = false;
+        const { ids, targetAudience } = action.payload;
+        // Update local state for all matched items
+        state.items = state.items.map((item) => 
+          ids.includes(item._id) 
+            ? { ...item, targetAudience } 
+            : item
+        );
+      })
+
+      // Global Rejected Matcher
+      .addMatcher(
+        (action) => action.type.endsWith("/rejected"),
+        (state, action: any) => {
+          state.loading = false;
+          state.uploading = false;
+          state.deleting = null;
+          state.error = action.payload as string;
+          state.success = false;
+        }
+      );
   },
 });
 

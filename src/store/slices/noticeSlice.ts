@@ -3,12 +3,14 @@ import { api } from "../../api/axios";
 
 /* ================= TYPES ================= */
 export type NoticePriority = "NORMAL" | "URGENT";
-export type TargetAudience = "ALL" | "JUDGES" | "REGISTRY" | "GUESTS";
+// Updated to match your Backend Model
+export type TargetAudience = "ALL" | "JUDGES" | "DR";
 
 export interface IAttachment {
   fileUrl: string;
   fileName: string;
   fileSize?: number;
+  fileType: string;
 }
 
 export interface IEventDetails {
@@ -35,7 +37,7 @@ export interface INotice {
     views: number;
     downloads: number;
   };
-  readBy?: string[];
+  readBy?: string[]; // Array of User IDs who have read this
   createdBy?: {
     _id: string;
     name: string;
@@ -46,7 +48,7 @@ export interface INotice {
 
 interface NoticeState {
   notices: INotice[];
-  publicNotices: INotice[];
+  publicNotices: INotice[]; // Specifically for items with audience "ALL"
   notice?: INotice;
   loading: boolean;
   uploading: boolean; 
@@ -64,7 +66,7 @@ const initialState: NoticeState = {
 
 export const fetchPublicNotices = createAsyncThunk(
   "notices/fetchPublic",
-  async (params: { priority?: string; search?: string; audience?: string } | undefined, thunkAPI) => {
+  async (params: { priority?: string; search?: string } | undefined, thunkAPI) => {
     try {
       const { data } = await api.get(`/notices/public`, { params });
       return data;
@@ -76,8 +78,9 @@ export const fetchPublicNotices = createAsyncThunk(
 
 export const fetchNotices = createAsyncThunk(
   "notices/fetchAll",
-  async (params: { priority?: string; search?: string; audience?: string } | undefined, thunkAPI) => {
+  async (params: { priority?: string; search?: string } | undefined, thunkAPI) => {
     try {
+      // Backend now filters this automatically based on req.user.role
       const { data } = await api.get(`/notices`, {
         params,
         withCredentials: true,
@@ -97,22 +100,9 @@ export const createNotice = createAsyncThunk(
         withCredentials: true,
         headers: { "Content-Type": "multipart/form-data" },
       });
-      return data; // Now returns the populated notice from backend
+      return data;
     } catch (err: any) {
       return thunkAPI.rejectWithValue(err.response?.data?.message || "Upload failed");
-    }
-  }
-);
-
-export const downloadNotice = createAsyncThunk(
-  "notices/download",
-  async (id: string, thunkAPI) => {
-    try {
-      const { data } = await api.get(`/notices/download/${id}`, { withCredentials: true });
-      if (data.url) window.open(data.url, "_blank");
-      return id;
-    } catch (err: any) {
-      return thunkAPI.rejectWithValue(err.response?.data?.message || "Download failed");
     }
   }
 );
@@ -156,6 +146,19 @@ export const deleteNotice = createAsyncThunk(
   }
 );
 
+export const downloadNotice = createAsyncThunk(
+  "notices/download",
+  async (id: string, thunkAPI) => {
+    try {
+      const { data } = await api.get(`/notices/download/${id}`, { withCredentials: true });
+      if (data.url) window.open(data.url, "_blank");
+      return id;
+    } catch (err: any) {
+      return thunkAPI.rejectWithValue(err.response?.data?.message || "Download failed");
+    }
+  }
+);
+
 /* ================= SLICE ================= */
 
 const noticeSlice = createSlice({
@@ -168,8 +171,7 @@ const noticeSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      /* FETCH ALL/PUBLIC */
-      .addCase(fetchPublicNotices.pending, (state) => { state.loading = true; })
+      /* FETCH LOGIC */
       .addCase(fetchPublicNotices.fulfilled, (state, action: PayloadAction<INotice[]>) => {
         state.loading = false;
         state.publicNotices = action.payload;
@@ -180,16 +182,14 @@ const noticeSlice = createSlice({
         state.notices = action.payload;
       })
 
-      /* CREATE NOTICE - Fixes the persistence issue */
+      /* CREATE */
       .addCase(createNotice.pending, (state) => {
         state.uploading = true;
         state.error = undefined;
       })
       .addCase(createNotice.fulfilled, (state, action: PayloadAction<INotice>) => {
         state.uploading = false;
-        // Unshift adds the new notice (with populated user name) to the top of the list
         state.notices.unshift(action.payload);
-        
         if (action.payload.targetAudience === "ALL") {
           state.publicNotices.unshift(action.payload);
         }
@@ -199,36 +199,39 @@ const noticeSlice = createSlice({
         state.error = action.payload as string;
       })
 
-      /* SINGLE NOTICE VIEW */
+      /* SINGLE VIEW & AUDIT SYNC */
       .addCase(fetchNoticeById.fulfilled, (state, action: PayloadAction<INotice>) => {
         state.notice = action.payload;
-        // Sync the item in the list if it exists
+        // Update statistics and read status in the main list
         const index = state.notices.findIndex((n) => n._id === action.payload._id);
         if (index !== -1) state.notices[index] = action.payload;
       })
 
-      /* UPDATE NOTICE */
-      .addCase(updateNotice.pending, (state) => {
-        state.uploading = true;
-      })
+      /* UPDATE */
+      .addCase(updateNotice.pending, (state) => { state.uploading = true; })
       .addCase(updateNotice.fulfilled, (state, action: PayloadAction<INotice>) => {
         state.uploading = false;
-        // Update item in all relevant state arrays
         state.notices = state.notices.map((n) => n._id === action.payload._id ? action.payload : n);
-        state.publicNotices = state.publicNotices.map((n) => n._id === action.payload._id ? action.payload : n);
         
+        // Remove from publicNotices if the update changed audience from ALL to something else
+        if (action.payload.targetAudience !== "ALL") {
+          state.publicNotices = state.publicNotices.filter((n) => n._id !== action.payload._id);
+        } else {
+          state.publicNotices = state.publicNotices.map((n) => n._id === action.payload._id ? action.payload : n);
+        }
+
         if (state.notice?._id === action.payload._id) {
           state.notice = action.payload;
         }
       })
 
-      /* DELETE NOTICE */
+      /* DELETE */
       .addCase(deleteNotice.fulfilled, (state, action: PayloadAction<string>) => {
         state.notices = state.notices.filter((n) => n._id !== action.payload);
         state.publicNotices = state.publicNotices.filter((n) => n._id !== action.payload);
       })
 
-      /* DOWNLOAD COUNTER */
+      /* STATS TRACKING */
       .addCase(downloadNotice.fulfilled, (state, action: PayloadAction<string>) => {
         const notice = state.notices.find((n) => n._id === action.payload);
         if (notice) notice.stats.downloads += 1;

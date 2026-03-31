@@ -11,18 +11,25 @@ import axios from "axios";
     TYPES
 =========================== */
 
+export type UserRole = "admin" | "judge" | "dr"; // Updated to match Model
+
 export interface User {
   _id: string;
   pj: string;
   name: string;
   email: string;
-  role: "admin" | "judge" | "guest";
+  role: UserRole;
   lastLogin?: string; 
 }
 
 interface AuthResponse {
+  success: boolean;
   user: User;
   accessToken: string;
+  // Added for DR First-Time Login
+  requiresPasswordChange?: boolean;
+  userId?: string; 
+  message?: string;
 }
 
 interface AuthState {
@@ -31,6 +38,9 @@ interface AuthState {
   loading: boolean;
   error: string | null;
   isInitialized: boolean;
+  // UI States for the "Two-Lane" flow
+  requiresPasswordChange: boolean;
+  tempUserId: string | null; 
 }
 
 const initialState: AuthState = {
@@ -39,20 +49,46 @@ const initialState: AuthState = {
   loading: false,
   error: null,
   isInitialized: false,
+  requiresPasswordChange: false,
+  tempUserId: null,
 };
 
 /* ===========================
     ASYNC THUNKS
 =========================== */
 
+/**
+ * Handles Hybrid Login (PJ or Email/Pass)
+ */
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
-  async ({ pj }: { pj: string }, { rejectWithValue }) => {
+  async (credentials: { pj?: string; email?: string; password?: string }, { rejectWithValue }) => {
     try {
-      const res = await api.post("/auth/login", { pj }, { withCredentials: true });
+      const res = await api.post("/auth/login", credentials, { withCredentials: true });
+      
+      // Handle the 202 status for DRs needing password setup
+      if (res.status === 202) {
+        return res.data as AuthResponse; 
+      }
+      
       return res.data as AuthResponse;
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Invalid credentials.");
+      return rejectWithValue(err.response?.data?.message || "Login failed.");
+    }
+  }
+);
+
+/**
+ * Finalizes DR Setup (Password Reset Lane)
+ */
+export const setupPassword = createAsyncThunk(
+  "auth/setupPassword",
+  async (data: { userId: string; newPassword: string }, { rejectWithValue }) => {
+    try {
+      const res = await api.patch("/auth/setup-password", data, { withCredentials: true });
+      return res.data as AuthResponse;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || "Failed to set password.");
     }
   }
 );
@@ -61,7 +97,6 @@ export const refreshUser = createAsyncThunk(
   "auth/refreshUser",
   async (_, { rejectWithValue }) => {
     try {
-      // Use standard axios for refresh to avoid interceptor loops
       const res = await axios.post(
         `${import.meta.env.VITE_API_URL}/auth/refresh`,
         {},
@@ -69,7 +104,6 @@ export const refreshUser = createAsyncThunk(
       );
       return res.data as AuthResponse;
     } catch (err: any) {
-      // "NO_SESSION" is a silent error handled in the extraReducers
       return rejectWithValue(err.response?.data?.message || "NO_SESSION");
     }
   }
@@ -77,13 +111,13 @@ export const refreshUser = createAsyncThunk(
 
 export const logoutUser = createAsyncThunk(
   "auth/logoutUser",
-  async (_, { rejectWithValue }) => {
+  async (allDevices: boolean = false, { rejectWithValue }) => {
     try {
-      await api.post("/auth/logout", {}, { withCredentials: true });
+      const endpoint = allDevices ? "/auth/logout-all" : "/auth/logout";
+      await api.post(endpoint, {}, { withCredentials: true });
       return true;
     } catch (err: any) {
-      // We still return true/success to the reducer to ensure local wipe
-      return rejectWithValue("Server logout failed, local session cleared.");
+      return rejectWithValue("Local session cleared.");
     }
   }
 );
@@ -99,7 +133,11 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
-    // Force a local wipe (used for 401 interceptors)
+    resetAuthFlow: (state) => {
+      state.requiresPasswordChange = false;
+      state.tempUserId = null;
+      state.error = null;
+    },
     clearUser: (state) => {
       state.user = null;
       state.accessToken = null;
@@ -110,15 +148,25 @@ const authSlice = createSlice({
 
   extraReducers: (builder: ActionReducerMapBuilder<AuthState>) => {
     builder
-      /* ---------- LOGIN ---------- */
+      /* ---------- LOGIN & SETUP ---------- */
       .addCase(loginUser.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(loginUser.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
         state.loading = false;
-        state.user = action.payload.user;
-        state.accessToken = action.payload.accessToken;
+        
+        if (action.payload.requiresPasswordChange) {
+          // DR Lane: Trigger the "Set Password" UI
+          state.requiresPasswordChange = true;
+          state.tempUserId = action.payload.userId || null;
+        } else {
+          // PJ or Verified DR Lane: Standard Login
+          state.user = action.payload.user;
+          state.accessToken = action.payload.accessToken;
+          state.requiresPasswordChange = false;
+          state.tempUserId = null;
+        }
         state.isInitialized = true;
       })
       .addCase(loginUser.rejected, (state, action) => {
@@ -127,10 +175,15 @@ const authSlice = createSlice({
         state.isInitialized = true;
       })
 
-      /* ---------- REFRESH ---------- */
-      .addCase(refreshUser.pending, (state) => {
-        state.loading = true;
+      /* ---------- SETUP PASSWORD (DR Success) ---------- */
+      .addCase(setupPassword.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
+        state.user = action.payload.user;
+        state.accessToken = action.payload.accessToken;
+        state.requiresPasswordChange = false;
+        state.tempUserId = null;
       })
+
+      /* ---------- REFRESH ---------- */
       .addCase(refreshUser.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
         state.loading = false;
         state.user = action.payload.user;
@@ -142,27 +195,19 @@ const authSlice = createSlice({
         state.user = null;
         state.accessToken = null;
         state.isInitialized = true;
-        // Only show error if it's a real failure, not just "no session found"
         const msg = action.payload as string;
-        if (msg && msg !== "NO_SESSION") {
-          state.error = msg;
-        }
+        if (msg !== "NO_SESSION") state.error = msg;
       })
 
-      /* ---------- LOGOUT MATCHER (The Fix) ---------- */
-      // This triggers on ANY logout action (fulfilled or rejected)
+      /* ---------- LOGOUT ---------- */
       .addMatcher(
         (action) => action.type.startsWith("auth/logoutUser"),
         (state) => {
-          state.user = null;
-          state.accessToken = null;
-          state.loading = false;
-          state.error = null;
-          state.isInitialized = true;
+          Object.assign(state, initialState, { isInitialized: true });
         }
       );
   },
 });
 
-export const { clearError, clearUser } = authSlice.actions;
+export const { clearError, clearUser, resetAuthFlow } = authSlice.actions;
 export default authSlice.reducer;

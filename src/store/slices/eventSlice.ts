@@ -10,6 +10,7 @@ import { api } from "../../api/axios";
 
 export type EventFilter = "UPCOMING" | "PAST" | "RECENT" | "ALL";
 export type EventStatus = "SCHEDULED" | "ONGOING" | "COMPLETED" | "CANCELLED";
+export type EventAudience = "JUDGES" | "DR" | "ALL";
 
 export interface IEvent {
   _id: string;
@@ -19,9 +20,9 @@ export interface IEvent {
   startDate: string; 
   endDate: string;   
   status: EventStatus;
+  targetAudience: EventAudience;
   isMandatory: boolean;
   capacity?: number;
-  // Updated: Optional image field to match Backend
   image?: {
     url: string;
     publicId: string;
@@ -52,14 +53,17 @@ export const fetchEvents = createAsyncThunk(
       const { data } = await api.get(`/events/get`, {
         params,
         withCredentials: true,
+        signal: thunkAPI.signal, // Crucial for stopping "Abnormal Reloads"
       });
-      return data;
+      // Safety: Ensure we always return an array to the fulfill matcher
+      return Array.isArray(data) ? data : data.events || [];
     } catch (err: any) {
+      if (err.name === 'CanceledError') throw err; 
       return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Failed to fetch events",
+        err.response?.data?.message || "Failed to fetch registry events"
       );
     }
-  },
+  }
 );
 
 export const fetchEventById = createAsyncThunk(
@@ -72,10 +76,10 @@ export const fetchEventById = createAsyncThunk(
       return data;
     } catch (err: any) {
       return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Failed to fetch event",
+        err.response?.data?.message || "Record retrieval failed"
       );
     }
-  },
+  }
 );
 
 export const fetchPublicEvents = createAsyncThunk(
@@ -83,13 +87,13 @@ export const fetchPublicEvents = createAsyncThunk(
   async (params: { filter?: EventFilter } | undefined, thunkAPI) => {
     try {
       const { data } = await api.get(`/events/public`, { params });
-      return data;
+      return Array.isArray(data) ? data : data.events || [];
     } catch (err: any) {
       return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Public fetch failed",
+        err.response?.data?.message || "Public fetch failed"
       );
     }
-  },
+  }
 );
 
 export const fetchPublicEventById = createAsyncThunk(
@@ -100,15 +104,12 @@ export const fetchPublicEventById = createAsyncThunk(
       return data;
     } catch (err: any) {
       return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Public detail fetch failed",
+        err.response?.data?.message || "Public detail fetch failed"
       );
     }
-  },
+  }
 );
 
-/**
- * Updated: createEvent now accepts FormData to support optional image upload
- */
 export const createEvent = createAsyncThunk(
   "events/create",
   async (formData: FormData, thunkAPI) => {
@@ -120,21 +121,15 @@ export const createEvent = createAsyncThunk(
       return data;
     } catch (err: any) {
       return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Creation failed",
+        err.response?.data?.message || "Creation failed"
       );
     }
-  },
+  }
 );
 
-/**
- * Updated: updateEvent now accepts FormData for the data payload
- */
 export const updateEvent = createAsyncThunk(
   "events/update",
-  async (
-    { id, formData }: { id: string; formData: FormData },
-    thunkAPI,
-  ) => {
+  async ({ id, formData }: { id: string; formData: FormData }, thunkAPI) => {
     try {
       const { data } = await api.put(`/events/update/${id}`, formData, {
         withCredentials: true,
@@ -143,10 +138,10 @@ export const updateEvent = createAsyncThunk(
       return data;
     } catch (err: any) {
       return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Update failed",
+        err.response?.data?.message || "Update failed"
       );
     }
-  },
+  }
 );
 
 export const deleteEvent = createAsyncThunk(
@@ -157,10 +152,10 @@ export const deleteEvent = createAsyncThunk(
       return id;
     } catch (err: any) {
       return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Deletion failed",
+        err.response?.data?.message || "Deletion failed"
       );
     }
-  },
+  }
 );
 
 /* ================= SLICE ================= */
@@ -178,70 +173,69 @@ const eventSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(
-        createEvent.fulfilled,
-        (state, action: PayloadAction<IEvent>) => {
-          state.loading = false;
-          state.events.unshift(action.payload);
-        },
-      )
-      .addCase(
-        updateEvent.fulfilled,
-        (state, action: PayloadAction<IEvent>) => {
-          state.loading = false;
-          state.events = state.events.map((e) =>
-            e._id === action.payload._id ? action.payload : e,
-          );
-          if (state.event?._id === action.payload._id)
-            state.event = action.payload;
-        },
-      )
-      .addCase(
-        deleteEvent.fulfilled,
-        (state, action: PayloadAction<string>) => {
-          state.loading = false;
-          state.events = state.events.filter((e) => e._id !== action.payload);
-        },
-      )
+      /* ---------- Fulfillment Handlers ---------- */
+      .addCase(createEvent.fulfilled, (state, action: PayloadAction<IEvent>) => {
+        state.loading = false;
+        state.events.unshift(action.payload);
+      })
+      .addCase(updateEvent.fulfilled, (state, action: PayloadAction<IEvent>) => {
+        state.loading = false;
+        state.events = state.events.map((e) =>
+          e._id === action.payload._id ? action.payload : e
+        );
+        if (state.event?._id === action.payload._id)
+          state.event = action.payload;
+      })
+      .addCase(deleteEvent.fulfilled, (state, action: PayloadAction<string>) => {
+        state.loading = false;
+        state.events = state.events.filter((e) => e._id !== action.payload);
+      })
 
-      /* ---------- Matchers ---------- */
+      /* ---------- Matchers (Unified State Management) ---------- */
+      
+      // 1. PENDING: Global loading trigger
       .addMatcher(
-        (action: Action): action is Action & { type: string } =>
-          action.type.endsWith("/pending"),
-        (state) => {
+        (action): action is Action => action.type.endsWith("/pending"),
+        (state, action) => {
           state.loading = true;
           state.error = undefined;
-        },
+          // Only clear event list if we are fetching a NEW list, not an update/delete
+          if (action.type.includes("fetchAll") || action.type.includes("fetchPublic")) {
+            state.events = []; 
+          }
+        }
       )
+
+      // 2. FULFILLED (Lists): Update main event array
       .addMatcher(
-        (action: Action): action is PayloadAction<string> =>
-          action.type.endsWith("/rejected"),
+        (action): action is PayloadAction<IEvent[]> =>
+          [fetchEvents.fulfilled.type, fetchPublicEvents.fulfilled.type].includes(action.type),
         (state, action) => {
           state.loading = false;
-          state.error = action.payload || "An unexpected error occurred";
-        },
+          state.events = action.payload || [];
+        }
       )
+
+      // 3. FULFILLED (Single): Update detailed view
       .addMatcher(
-        (action: Action): action is PayloadAction<IEvent[]> =>
-          [
-            fetchEvents.fulfilled.type,
-            fetchPublicEvents.fulfilled.type,
-          ].includes(action.type),
-        (state, action) => {
-          state.loading = false;
-          state.events = action.payload;
-        },
-      )
-      .addMatcher(
-        (action: Action): action is PayloadAction<IEvent> =>
-          [
-            fetchEventById.fulfilled.type,
-            fetchPublicEventById.fulfilled.type,
-          ].includes(action.type),
+        (action): action is PayloadAction<IEvent> =>
+          [fetchEventById.fulfilled.type, fetchPublicEventById.fulfilled.type].includes(action.type),
         (state, action) => {
           state.loading = false;
           state.event = action.payload;
-        },
+        }
+      )
+
+      // 4. REJECTED / ABORTED: Kill loading safely
+      .addMatcher(
+        (action): action is Action => action.type.endsWith("/rejected"),
+        (state, action: any) => {
+          state.loading = false;
+          // If aborted by the AbortController in useEffect, don't set an error message
+          if (action.meta?.aborted) return;
+          
+          state.error = action.payload || "A registry connection error occurred";
+        }
       );
   },
 });

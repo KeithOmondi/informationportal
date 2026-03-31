@@ -62,7 +62,7 @@ const CourtInformation: React.FC = () => {
         <p className="text-[#C5A059] uppercase font-black text-[9px] md:text-[10px] tracking-[0.3em] md:tracking-[0.4em] mb-4">
           Republic of Kenya
         </p>
-        <h1 className="text-white font-serif text-2xl md:text-4xl font-bold tracking-tight uppercase">
+        <h1 className="text-white font-serif text-2xl md:text-2xl font-bold tracking-tight uppercase">
           The High Court of Kenya
         </h1>
       </section>
@@ -82,10 +82,10 @@ const CourtInformation: React.FC = () => {
             </div>
             {/* Overlay Label - Adjusted for better mobile visibility */}
             <div className="absolute bottom-0 left-0 w-full p-5 md:p-8 bg-gradient-to-t from-[#355E3B] via-[#355E3B]/90 to-transparent md:bg-[#355E3B]/95 md:border-t-4 border-[#C5A059]">
-              <h3 className="text-white font-serif font-bold text-lg md:text-2xl tracking-wide leading-tight">
+              <h3 className="text-white text-center font-serif font-bold text-lg md:text-1xl tracking-wide leading-tight">
                 {leadData.name}
               </h3>
-              <p className="text-[#C5A059] font-black text-[9px] md:text-[11px] uppercase tracking-[0.2em] mt-1 md:mt-2">
+              <p className="text-[#C5A059] text-center font-black text-[9px] md:text-[11px] uppercase tracking-[0.2em] mt-1 md:mt-2">
                 {leadData.title}
               </p>
             </div>
@@ -140,7 +140,7 @@ const CourtInformation: React.FC = () => {
       {/* INFORMATION TO NOTE SECTION */}
       <section className="bg-white border border-slate-200 p-6 md:p-10 shadow-sm">
         <div className="flex items-center gap-4 md:gap-6 mb-6 md:mb-10">
-          <h2 className="text-[#355E3B] font-serif text-xl md:text-3xl font-bold uppercase tracking-tighter shrink-0">
+          <h2 className="text-[#355E3B] font-serif text-xl md:text-2xl font-bold uppercase tracking-tighter shrink-0">
             Information to Note
           </h2>
           <div className="h-1 flex-1 bg-slate-100" />
