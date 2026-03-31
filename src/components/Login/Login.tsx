@@ -55,7 +55,7 @@ const Login: React.FC = () => {
   }, [user, navigate, isInitialized, requiresPasswordChange]);
 
   /* ===========================
-      ERROR TOAST HANDLING (FIXED)
+      ERROR TOAST HANDLING
   =========================== */
   useEffect(() => {
     if (error && window.location.pathname === "/login") {
@@ -65,12 +65,11 @@ const Login: React.FC = () => {
   }, [error, dispatch]);
 
   /* ===========================
-      LOGIN HANDLER (FIXED)
+      LOGIN HANDLER
   =========================== */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ✅ Clear any stale errors before new attempt
     dispatch(clearError());
 
     const toastId = toast.loading("Verifying with High Court Registry...");
@@ -126,7 +125,7 @@ const Login: React.FC = () => {
               type="button"
               onClick={() => {
                 setLoginMode("pj");
-                dispatch(clearError()); // ✅ clear stale errors
+                dispatch(clearError());
               }}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
                 loginMode === "pj"
@@ -141,7 +140,7 @@ const Login: React.FC = () => {
               type="button"
               onClick={() => {
                 setLoginMode("dr");
-                dispatch(clearError()); // ✅ clear stale errors
+                dispatch(clearError());
               }}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
                 loginMode === "dr"
@@ -180,7 +179,7 @@ const Login: React.FC = () => {
                     onChange={(e) => setPj(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 focus:border-[#C5A059] rounded-xl pl-12 pr-4 py-3.5 text-sm font-semibold text-slate-800 outline-none transition-all"
                     placeholder="Enter PJ Number"
-                    required
+                    required={loginMode === "pj"} // ✅ Only required on PJ tab
                   />
                 </div>
               </div>
@@ -200,7 +199,7 @@ const Login: React.FC = () => {
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 focus:border-[#C5A059] rounded-xl pl-12 pr-4 py-3.5 text-sm font-semibold text-slate-800 outline-none transition-all"
                       placeholder="name@court.go.ke"
-                      required
+                      required={loginMode === "dr"} // ✅ Only required on DR tab
                     />
                   </div>
                 </div>
@@ -219,7 +218,7 @@ const Login: React.FC = () => {
                       onChange={(e) => setPassword(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 focus:border-[#C5A059] rounded-xl pl-12 pr-4 py-3.5 text-sm font-semibold text-slate-800 outline-none transition-all"
                       placeholder="••••••••"
-                      required
+                      required={loginMode === "dr"} // ✅ Only required on DR tab
                     />
                   </div>
                 </div>
