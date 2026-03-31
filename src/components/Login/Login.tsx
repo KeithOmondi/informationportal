@@ -152,18 +152,18 @@ const Login: React.FC = () => {
                 loginMode === "dr" ? "bg-white text-[#355E3B] shadow-sm" : "text-slate-400 hover:text-slate-600"
               }`}
             >
-              <Mail size={14} /> Staff (DR)
-            </button>
+              <Mail size={14} /> DEPUTY REGISTRAR
+                          </button>
           </nav>
 
           <div className="mb-6 text-center">
             <h2 className="text-lg font-serif font-bold text-slate-800 tracking-tight uppercase">
-              {loginMode === "pj" ? "Judiciary Login" : "Staff Portal"}
+              {loginMode === "pj" ? "Judges Login" : "DR Login Portal"}
             </h2>
             <p className="text-xs text-slate-500 mt-1">
               {loginMode === "pj"
-                ? "Enter your unique PJ identifier to proceed."
-                : "Enter your official credentials to authenticate."}
+                ? "Enter your pj number to proceed."
+                : "Enter your Email and Password to proceed."}
             </p>
           </div>
 
@@ -183,7 +183,7 @@ const Login: React.FC = () => {
                     value={pj}
                     onChange={(e) => setPj(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 focus:border-[#C5A059] rounded-xl pl-12 pr-4 py-3.5 text-sm font-semibold text-slate-800 outline-none transition-all"
-                    placeholder="PJ-XXXXX"
+                    placeholder="12345"
                     required
                   />
                 </div>
@@ -204,7 +204,7 @@ const Login: React.FC = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 focus:border-[#C5A059] rounded-xl pl-12 pr-4 py-3.5 text-sm font-semibold text-slate-800 outline-none transition-all"
-                      placeholder="justice@court.go.ke"
+                      placeholder="user@gmail.com"
                       required
                     />
                   </div>
@@ -248,7 +248,7 @@ const Login: React.FC = () => {
                 </>
               ) : (
                 <>
-                  Establish Secure Session <ArrowRight size={16} />
+                  Login <ArrowRight size={16} />
                 </>
               )}
             </button>
