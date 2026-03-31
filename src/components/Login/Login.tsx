@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { UserCircle, ArrowRight, Scale, ShieldCheck, Mail, Lock, Loader2 } from "lucide-react";
+import {
+  UserCircle,
+  ArrowRight,
+  Scale,
+  ShieldCheck,
+  Mail,
+  Lock,
+  Loader2,
+} from "lucide-react";
 
 import type { RootState } from "../../store/store";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
@@ -40,7 +48,7 @@ const Login: React.FC = () => {
       };
 
       const targetPath = routes[user.role] || "/unauthorized";
-      
+
       if (window.location.pathname !== targetPath) {
         navigate(targetPath, { replace: true });
       }
@@ -78,9 +86,13 @@ const Login: React.FC = () => {
       const result = await dispatch(loginUser(credentials)).unwrap();
 
       if (result.requiresPasswordChange) {
-        toast.success("Identity Verified. Initializing Setup.", { id: toastId });
+        toast.success("Identity Verified. Initializing Setup.", {
+          id: toastId,
+        });
       } else {
-        toast.success("Welcome, " + (result.user?.name || "Officer"), { id: toastId });
+        toast.success("Welcome, " + (result.user?.name || "Officer"), {
+          id: toastId,
+        });
         dispatch(initPushSubscription());
       }
     } catch (err: any) {
@@ -110,13 +122,19 @@ const Login: React.FC = () => {
       <div className="absolute bottom-0 left-0 w-full h-2 bg-[#C5A059] z-50" />
 
       {/* Decorative Watermark */}
-      <Scale className="absolute -right-24 -bottom-24 text-slate-200/50 rotate-[-15deg] pointer-events-none" size={400} aria-hidden="true" />
+      <Scale
+        className="absolute -right-24 -bottom-24 text-slate-200/50 rotate-[-15deg] pointer-events-none"
+        size={400}
+        aria-hidden="true"
+      />
 
       <div className="w-full max-w-md px-6 z-10">
         <header className="text-center mb-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#355E3B]/10 text-[#355E3B] mb-4">
             <ShieldCheck size={14} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Authorized Access Only</span>
+            <span className="text-[10px] font-black uppercase tracking-widest">
+              Authorized Access Only
+            </span>
           </div>
           <h1 className="text-2xl font-serif font-bold text-[#355E3B] leading-tight">
             OFFICE OF THE REGISTRAR
@@ -137,10 +155,12 @@ const Login: React.FC = () => {
               type="button"
               onClick={() => toggleMode("pj")}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
-                loginMode === "pj" ? "bg-white text-[#355E3B] shadow-sm" : "text-slate-400 hover:text-slate-600"
+                loginMode === "pj"
+                  ? "bg-white text-[#355E3B] shadow-sm"
+                  : "text-slate-400 hover:text-slate-600"
               }`}
             >
-              <Scale size={14} /> Judge 
+              <Scale size={14} /> Judge
             </button>
 
             <button
@@ -149,11 +169,13 @@ const Login: React.FC = () => {
               type="button"
               onClick={() => toggleMode("dr")}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
-                loginMode === "dr" ? "bg-white text-[#355E3B] shadow-sm" : "text-slate-400 hover:text-slate-600"
+                loginMode === "dr"
+                  ? "bg-white text-[#355E3B] shadow-sm"
+                  : "text-slate-400 hover:text-slate-600"
               }`}
             >
               <Mail size={14} /> DEPUTY REGISTRAR
-                          </button>
+            </button>
           </nav>
 
           <div className="mb-6 text-center">
@@ -215,8 +237,12 @@ const Login: React.FC = () => {
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                       Password
                     </label>
-                    <button type="button" className="text-[9px] font-bold text-[#C5A059] uppercase hover:underline">
-                      Reset
+                    <button
+                      type="button"
+                      onClick={() => navigate("/forgot-password")}
+                      className="text-[9px] font-bold text-[#C5A059] uppercase hover:underline hover:text-[#355E3B] transition-colors"
+                    >
+                      Forgot Password?
                     </button>
                   </div>
                   <div className="relative mt-1.5">

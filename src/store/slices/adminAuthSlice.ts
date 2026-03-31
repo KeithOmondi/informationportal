@@ -11,7 +11,7 @@ import axios from "axios";
     TYPES
 =========================== */
 
-export type UserRole = "admin" | "judge" | "dr"; // Updated to match Model
+export type UserRole = "admin" | "judge" | "dr";
 
 export interface User {
   _id: string;
@@ -19,16 +19,15 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
-  lastLogin?: string; 
+  lastLogin?: string;
 }
 
 interface AuthResponse {
   success: boolean;
   user: User;
   accessToken: string;
-  // Added for DR First-Time Login
   requiresPasswordChange?: boolean;
-  userId?: string; 
+  userId?: string;
   message?: string;
 }
 
@@ -38,9 +37,11 @@ interface AuthState {
   loading: boolean;
   error: string | null;
   isInitialized: boolean;
-  // UI States for the "Two-Lane" flow
   requiresPasswordChange: boolean;
-  tempUserId: string | null; 
+  tempUserId: string | null;
+  // NEW: Reset Flow UI States
+  resetEmailSent: boolean;
+  passwordResetSuccess: boolean;
 }
 
 const initialState: AuthState = {
@@ -51,6 +52,8 @@ const initialState: AuthState = {
   isInitialized: false,
   requiresPasswordChange: false,
   tempUserId: null,
+  resetEmailSent: false,
+  passwordResetSuccess: false,
 };
 
 /* ===========================
@@ -58,19 +61,13 @@ const initialState: AuthState = {
 =========================== */
 
 /**
- * Handles Hybrid Login (PJ or Email/Pass)
+ * 1. Hybrid Login
  */
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
   async (credentials: { pj?: string; email?: string; password?: string }, { rejectWithValue }) => {
     try {
       const res = await api.post("/auth/login", credentials, { withCredentials: true });
-      
-      // Handle the 202 status for DRs needing password setup
-      if (res.status === 202) {
-        return res.data as AuthResponse; 
-      }
-      
       return res.data as AuthResponse;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || "Login failed.");
@@ -79,7 +76,37 @@ export const loginUser = createAsyncThunk(
 );
 
 /**
- * Finalizes DR Setup (Password Reset Lane)
+ * 2. Forgot Password (Request Email)
+ */
+export const requestPasswordReset = createAsyncThunk(
+  "auth/requestPasswordReset",
+  async (email: string, { rejectWithValue }) => {
+    try {
+      const res = await api.post("/auth/forgot-password", { email });
+      return res.data;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || "Failed to send reset link.");
+    }
+  }
+);
+
+/**
+ * 3. Reset Password (Submit New Password)
+ */
+export const finalizePasswordReset = createAsyncThunk(
+  "auth/finalizePasswordReset",
+  async ({ token, password }: any, { rejectWithValue }) => {
+    try {
+      const res = await api.patch(`/auth/reset-password/${token}`, { password });
+      return res.data;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || "Reset link invalid or expired.");
+    }
+  }
+);
+
+/**
+ * 4. DR Setup
  */
 export const setupPassword = createAsyncThunk(
   "auth/setupPassword",
@@ -137,6 +164,8 @@ const authSlice = createSlice({
       state.requiresPasswordChange = false;
       state.tempUserId = null;
       state.error = null;
+      state.resetEmailSent = false;
+      state.passwordResetSuccess = false;
     },
     clearUser: (state) => {
       state.user = null;
@@ -148,24 +177,19 @@ const authSlice = createSlice({
 
   extraReducers: (builder: ActionReducerMapBuilder<AuthState>) => {
     builder
-      /* ---------- LOGIN & SETUP ---------- */
+      /* ---------- LOGIN ---------- */
       .addCase(loginUser.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(loginUser.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
         state.loading = false;
-        
         if (action.payload.requiresPasswordChange) {
-          // DR Lane: Trigger the "Set Password" UI
           state.requiresPasswordChange = true;
           state.tempUserId = action.payload.userId || null;
         } else {
-          // PJ or Verified DR Lane: Standard Login
           state.user = action.payload.user;
           state.accessToken = action.payload.accessToken;
-          state.requiresPasswordChange = false;
-          state.tempUserId = null;
         }
         state.isInitialized = true;
       })
@@ -175,7 +199,35 @@ const authSlice = createSlice({
         state.isInitialized = true;
       })
 
-      /* ---------- SETUP PASSWORD (DR Success) ---------- */
+      /* ---------- FORGOT PASSWORD ---------- */
+      .addCase(requestPasswordReset.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(requestPasswordReset.fulfilled, (state) => {
+        state.loading = false;
+        state.resetEmailSent = true;
+      })
+      .addCase(requestPasswordReset.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+
+      /* ---------- RESET PASSWORD ---------- */
+      .addCase(finalizePasswordReset.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(finalizePasswordReset.fulfilled, (state) => {
+        state.loading = false;
+        state.passwordResetSuccess = true;
+      })
+      .addCase(finalizePasswordReset.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+
+      /* ---------- SETUP PASSWORD ---------- */
       .addCase(setupPassword.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
         state.user = action.payload.user;
         state.accessToken = action.payload.accessToken;

@@ -34,6 +34,8 @@ import DrEvents from "../pages/dr/DrEvents";
 import AdminProgram from "../pages/admin/AdminProgram";
 import DrProgramme from "../pages/dr/DrProgramme";
 import DrGallery from "../pages/dr/DrGallery";
+import ForgotPassword from "../components/Login/ForgotPassword";
+import ResetPassword from "../components/Login/ResetPassword";
 
 export default function AppRoutes() {
   return (
@@ -41,6 +43,8 @@ export default function AppRoutes() {
       {/* 1. PUBLIC ROUTES */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/setup-password" element={<DrPasswordSetup />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password/:token" element={<ResetPassword />} />
 
       {/* 2. ADMIN ROUTES */}
       <Route
@@ -102,13 +106,10 @@ export default function AppRoutes() {
         <Route path="events" element={<DrEvents />} />
         <Route path="programme" element={<DrProgramme />} />
         <Route path="gallery" element={<DrGallery />} />
-        
 
         {/* Default redirect for /judge */}
         <Route index element={<Navigate to="dashboard" replace />} />
       </Route>
-
-     
 
       {/* 4. ROOT & FALLBACK ROUTES */}
       <Route path="/" element={<Navigate to="/judge/dashboard" replace />} />
