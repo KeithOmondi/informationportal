@@ -140,7 +140,7 @@ const Login: React.FC = () => {
                 loginMode === "pj" ? "bg-white text-[#355E3B] shadow-sm" : "text-slate-400 hover:text-slate-600"
               }`}
             >
-              <Scale size={14} /> Judge / Admin
+              <Scale size={14} /> Judge 
             </button>
 
             <button
