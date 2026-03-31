@@ -175,7 +175,7 @@ const DrDashboard = () => {
         <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-6 gap-4">
           <div className="space-y-2">
             <h1 className="text-3xl md:text-4xl font-serif text-[#355E3B] font-black">
-              Welcome, <span className="capitalize">DR. {displayName}</span>
+              Welcome, <span className="capitalize">Hon. {displayName}</span>
             </h1>
             <div className="flex flex-wrap items-center gap-4 text-slate-500">
                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold uppercase tracking-wider border border-slate-200">
