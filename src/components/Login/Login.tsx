@@ -9,6 +9,8 @@ import {
   Mail,
   Lock,
   Loader2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 import type { RootState } from "../../store/store";
@@ -21,6 +23,7 @@ const Login: React.FC = () => {
   const [pj, setPj] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false); // Added for password visibility
 
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -32,7 +35,6 @@ const Login: React.FC = () => {
       1. NAVIGATION GUARD & ROLE REDIRECTION
   ===================================================== */
   useEffect(() => {
-    // Wait for the 'refreshUser' check to complete before acting
     if (!isInitialized) return;
 
     if (requiresPasswordChange) {
@@ -60,10 +62,10 @@ const Login: React.FC = () => {
   =========================== */
   const toggleMode = (mode: "pj" | "dr") => {
     setLoginMode(mode);
-    // CRITICAL: Clear the other lane's data to prevent payload contamination
     setPj("");
     setEmail("");
     setPassword("");
+    setShowPassword(false); // Reset visibility on mode switch
     dispatch(clearError());
   };
 
@@ -96,7 +98,6 @@ const Login: React.FC = () => {
         dispatch(initPushSubscription());
       }
     } catch (err: any) {
-      // Backend generic errors like "Invalid credentials" land here
       toast.error(err || "Authentication Failed", { id: toastId });
     }
   };
@@ -117,11 +118,9 @@ const Login: React.FC = () => {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-slate-50 flex items-center justify-center relative">
-      {/* Visual Identity Borders */}
       <div className="absolute top-0 left-0 w-full h-2 bg-[#355E3B] z-50" />
       <div className="absolute bottom-0 left-0 w-full h-2 bg-[#C5A059] z-50" />
 
-      {/* Decorative Watermark */}
       <Scale
         className="absolute -right-24 -bottom-24 text-slate-200/50 rotate-[-15deg] pointer-events-none"
         size={400}
@@ -147,7 +146,6 @@ const Login: React.FC = () => {
         <main className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-8 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1 h-full bg-[#355E3B]" />
 
-          {/* Lane Toggle */}
           <nav className="flex bg-slate-100 p-1 rounded-xl mb-8" role="tablist">
             <button
               role="tab"
@@ -250,14 +248,21 @@ const Login: React.FC = () => {
                       <Lock size={18} />
                     </div>
                     <input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 focus:border-[#C5A059] rounded-xl pl-12 pr-4 py-3.5 text-sm font-semibold text-slate-800 outline-none transition-all"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-[#C5A059] rounded-xl pl-12 pr-12 py-3.5 text-sm font-semibold text-slate-800 outline-none transition-all"
                       placeholder="••••••••"
                       required
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
                 </div>
               </>
