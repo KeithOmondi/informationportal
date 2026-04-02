@@ -173,7 +173,9 @@ const DrDashboard = () => {
         
         {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-6 gap-4">
+          
           <div className="space-y-2">
+            
             <h1 className="text-3xl md:text-4xl font-serif text-[#355E3B] font-black">
               Welcome, <span className="capitalize">Hon. {displayName}</span>
             </h1>

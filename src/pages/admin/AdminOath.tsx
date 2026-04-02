@@ -199,7 +199,7 @@ const AdminCeremony = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end border-b border-slate-200 pb-6 gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-serif font-bold text-[#1a1a1a] uppercase tracking-tight">
-            Ceremony Materials
+            Conference Materials
           </h1>
           <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-1">
             Admin Management Portal
