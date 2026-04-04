@@ -69,7 +69,7 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
           className="mt-8 flex items-center gap-2 text-[#c5a059] text-[10px] font-black uppercase tracking-[0.2em] hover:text-[#e2bc7a] transition-colors"
         >
           <ArrowLeft size={14} />
-          Return to Previous
+          Return to Login
         </Link>
       </div>
     );
