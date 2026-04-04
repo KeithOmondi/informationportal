@@ -82,7 +82,7 @@ const DrHeader = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
               </div>
               <div className="hidden md:block text-left pr-1">
                 <p className="text-white text-[10px] font-black leading-none truncate max-w-[120px] uppercase tracking-wide">
-                  {user?.name}
+                  Hon. {user?.name}
                 </p>
                 <p className="text-[#c2a336] text-[7px] font-black uppercase mt-1 tracking-widest opacity-90">
                   P.J. NO: {user?.pj || "REGISTRY"}
