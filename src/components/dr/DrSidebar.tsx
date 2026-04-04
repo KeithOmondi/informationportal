@@ -45,13 +45,16 @@ const DrSidebar: React.FC<DrSidebarProps> = ({ isOpen, setIsOpen }) => {
     <>
       {/* 📱 MOBILE TOP BAR */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-[100] bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className="bg-[#355E3B] p-1.5 rounded-lg">
-            <Gavel size={16} className="text-[#C5A059]" />
-          </div>
-          <span className="text-xs font-black tracking-tighter">
-            JUDICIAL PORTAL
-          </span>
+        <div className="p-1 sm:p-2 bg-white rounded-lg border-l-[3px] border-[#355E3B] flex flex-col justify-center min-w-0">
+            <h1 className="text-[#355E3B] font-serif text-[11px] sm:text-xs lg:text-sm font-black leading-none uppercase tracking-tighter truncate">
+              High Court Information Portal
+            </h1>
+            <div className="flex items-center gap-1 mt-0.5 sm:mt-1">
+              <div className="h-[1px] w-2 lg:w-3 bg-[#C5A059]" />
+              <p className="text-[#C5A059] text-[7px] sm:text-[8px] lg:text-[9px] font-black uppercase tracking-[0.15em] leading-none whitespace-nowrap">
+                Republic of Kenya
+              </p>
+            </div>
         </div>
 
         <button
