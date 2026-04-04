@@ -166,7 +166,8 @@ const DrNotices = () => {
                     {notice.title}
                   </h3>
 
-                  <div className="description-container mb-10 max-w-5xl line-clamp-3 lg:line-clamp-none">
+                  {/* FULL DESCRIPTION — no truncation */}
+                  <div className="description-container mb-10 max-w-5xl">
                     {renderFormattedDescription(notice.description)}
                   </div>
 
