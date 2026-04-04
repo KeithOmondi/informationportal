@@ -72,12 +72,12 @@ const DrNotices = () => {
       <div className="border-b border-slate-200 pb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="text-left">
           <h1 className="text-[#1a3a32] font-serif text-2xl md:text-2xl font-black mb-2 tracking-tight">
-            ORHC Notice Board
+          Notice Board
           </h1>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-[#c2a336]" />
             <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
-              Deputy Registrar Administrative Portal
+              Deputy Registrar Notice Board
             </p>
           </div>
         </div>
@@ -216,7 +216,7 @@ const DrNotices = () => {
       <div className="flex items-center justify-center gap-2 py-6 border-t border-slate-100">
         <CheckCircle size={14} className="text-[#1a3a32]" />
         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.15em]">
-          Office of the Registrar High Court • Official Audit Registry
+          Office of the Registrar High Court • Information Portal
         </p>
       </div>
     </div>
@@ -226,7 +226,7 @@ const DrNotices = () => {
 const LoaderIcon = () => (
   <div className="flex flex-col items-center gap-4">
     <div className="w-10 h-10 border-[3px] border-[#1a3a32]/10 border-t-[#1a3a32] rounded-full animate-spin" />
-    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Registry Synchronizing...</p>
+    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Synchronizing data...</p>
   </div>
 );
 

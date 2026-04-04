@@ -198,7 +198,7 @@ const CourtInformation: React.FC = () => {
       {/* FOOTER BLOCK */}
       <div className="bg-slate-50 p-6 text-center border border-slate-200 rounded-b-[0.5rem]">
         <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] leading-relaxed">
-          Judges Information Portal • High Court of Kenya • 2026
+          High Court Information Portal • High Court of Kenya • 2026
         </p>
       </div>
     </div>

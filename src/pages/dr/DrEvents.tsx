@@ -71,7 +71,7 @@ const DrEvents = () => {
           </div>
           <div>
             <h1 className="text-[#1a3a32] font-serif text-3xl font-black tracking-tight">Events</h1>
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">Deputy Registrar Console</p>
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">Deputy Registrar Events Board</p>
           </div>
         </div>
 
