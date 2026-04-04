@@ -234,7 +234,7 @@ const DrDashboard = () => {
                 <StatCard
                   title="Notices"
                   value={activeNotices.length}
-                  subtext={urgentNoticesCount > 0 ? `${urgentNoticesCount} Pending Actions` : "Admin Overview"}
+                  subtext={urgentNoticesCount > 0 ? `${urgentNoticesCount} Pending Actions` : "Notices Overview"}
                   loading={showNoticesLoading}
                   urgent={urgentNoticesCount > 0}
                 />
@@ -244,7 +244,7 @@ const DrDashboard = () => {
                 <StatCard
                   title="Gallery"
                   value={galleryCount}
-                  subtext="Registry Archive"
+                  subtext="Media Archive"
                   loading={showGalleryLoading}
                   locked={galleryCount === 0}
                 />
@@ -254,7 +254,7 @@ const DrDashboard = () => {
                 <StatCard
                   title="Events Calendar"
                   value={events.length}
-                  subtext="Institutional Schedule"
+                  subtext="Events Overview"
                   loading={showEventsLoading}
                   showBadge={hasNewEvent}
                   badgeText="EVENT UPDATE"
@@ -265,7 +265,7 @@ const DrDashboard = () => {
                 <StatCard
                   title="Programme & Files"
                   value={totalResources}
-                  subtext={`${judges?.length || 0} Judicial Profiles`}
+                  subtext={`${judges?.length || 0} Profiles`}
                   loading={showCeremonyLoading}
                   urgent={totalResources > 0}
                   locked={totalResources === 0}
