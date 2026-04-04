@@ -1,4 +1,4 @@
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import type { ReactNode } from "react";
 import type { RootState } from "../store/store";
@@ -15,7 +15,6 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
     (state: RootState) => state.auth
   );
   const location = useLocation();
-  const navigate = useNavigate();
 
   /* =====================================================
       1. INITIALIZATION LOAD
@@ -65,13 +64,13 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
           The <span className="text-red-400">{user.role}</span> role has insufficient clearance for this registry section.
         </p>
 
-        <button
-          onClick={() => navigate(-1)}
+        <Link to="/login"
+
           className="mt-8 flex items-center gap-2 text-[#c5a059] text-[10px] font-black uppercase tracking-[0.2em] hover:text-[#e2bc7a] transition-colors"
         >
           <ArrowLeft size={14} />
           Return to Previous
-        </button>
+        </Link>
       </div>
     );
   }
