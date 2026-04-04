@@ -16,23 +16,18 @@ import InstallButton from "./components/InstallButton";
 
 const AppContent = () => {
   const dispatch = useDispatch<AppDispatch>();
-
   const socketInitialized = useRef(false);
-  const authChecked = useRef(false);
 
-  const { user, isInitialized } = useSelector((state: RootState) => state.auth);
+  const { user, isInitialized, loading } = useSelector(
+    (state: RootState) => state.auth
+  );
 
+  // ✅ Fire once on mount — no refs, no conditions
   useEffect(() => {
-    if (isInitialized) {
-      authChecked.current = true;
-      return;
-    }
-    if (!authChecked.current) {
-      authChecked.current = true;
-      dispatch(refreshUser());
-    }
-  }, [dispatch, isInitialized]);
+    dispatch(refreshUser());
+  }, [dispatch]);
 
+  // ✅ Socket lifecycle tied to user identity
   useEffect(() => {
     if (user?._id) {
       if (!socketInitialized.current) {
@@ -45,7 +40,8 @@ const AppContent = () => {
     }
   }, [user?._id]);
 
-  if (!isInitialized) {
+  // ✅ Block ALL route rendering until refresh resolves
+  if (!isInitialized || loading) {
     return (
       <div className="min-h-screen bg-[#060b13] flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin text-[#c5a059]" size={40} />

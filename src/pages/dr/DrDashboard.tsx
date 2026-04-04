@@ -202,7 +202,7 @@ const DrDashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           <Link to="/dr/notice">
             <StatCard
-              title="Registry Notices"
+              title="Notices"
               value={activeNotices.length}
               subtext={urgentNoticesCount > 0 ? `${urgentNoticesCount} Pending Actions` : "Admin Overview"}
               loading={noticesLoading && notices.length === 0}
@@ -213,7 +213,7 @@ const DrDashboard = () => {
           {/* FIXED GALLERY CARD */}
           <Link to="/dr/gallery">
             <StatCard
-              title="Media Gallery"
+              title="Gallery"
               value={galleryCount}
               subtext="Registry Archive"
               loading={galleryLoading}

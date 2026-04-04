@@ -39,7 +39,6 @@ interface AuthState {
   isInitialized: boolean;
   requiresPasswordChange: boolean;
   tempUserId: string | null;
-  // NEW: Reset Flow UI States
   resetEmailSent: boolean;
   passwordResetSuccess: boolean;
 }
@@ -60,14 +59,16 @@ const initialState: AuthState = {
     ASYNC THUNKS
 =========================== */
 
-/**
- * 1. Hybrid Login
- */
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
-  async (credentials: { pj?: string; email?: string; password?: string }, { rejectWithValue }) => {
+  async (
+    credentials: { pj?: string; email?: string; password?: string },
+    { rejectWithValue }
+  ) => {
     try {
-      const res = await api.post("/auth/login", credentials, { withCredentials: true });
+      const res = await api.post("/auth/login", credentials, {
+        withCredentials: true,
+      });
       return res.data as AuthResponse;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || "Login failed.");
@@ -75,9 +76,6 @@ export const loginUser = createAsyncThunk(
   }
 );
 
-/**
- * 2. Forgot Password (Request Email)
- */
 export const requestPasswordReset = createAsyncThunk(
   "auth/requestPasswordReset",
   async (email: string, { rejectWithValue }) => {
@@ -85,37 +83,44 @@ export const requestPasswordReset = createAsyncThunk(
       const res = await api.post("/auth/forgot-password", { email });
       return res.data;
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to send reset link.");
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to send reset link."
+      );
     }
   }
 );
 
-/**
- * 3. Reset Password (Submit New Password)
- */
 export const finalizePasswordReset = createAsyncThunk(
   "auth/finalizePasswordReset",
   async ({ token, password }: any, { rejectWithValue }) => {
     try {
-      const res = await api.patch(`/auth/reset-password/${token}`, { password });
+      const res = await api.patch(`/auth/reset-password/${token}`, {
+        password,
+      });
       return res.data;
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Reset link invalid or expired.");
+      return rejectWithValue(
+        err.response?.data?.message || "Reset link invalid or expired."
+      );
     }
   }
 );
 
-/**
- * 4. DR Setup
- */
 export const setupPassword = createAsyncThunk(
   "auth/setupPassword",
-  async (data: { userId: string; newPassword: string }, { rejectWithValue }) => {
+  async (
+    data: { userId: string; newPassword: string },
+    { rejectWithValue }
+  ) => {
     try {
-      const res = await api.patch("/auth/setup-password", data, { withCredentials: true });
+      const res = await api.patch("/auth/setup-password", data, {
+        withCredentials: true,
+      });
       return res.data as AuthResponse;
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to set password.");
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to set password."
+      );
     }
   }
 );
@@ -236,17 +241,22 @@ const authSlice = createSlice({
       })
 
       /* ---------- REFRESH ---------- */
+      // ✅ NEW: pending case blocks routes from rendering prematurely
+      .addCase(refreshUser.pending, (state) => {
+        state.loading = true;
+        state.isInitialized = false;
+      })
       .addCase(refreshUser.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
         state.loading = false;
         state.user = action.payload.user;
         state.accessToken = action.payload.accessToken;
-        state.isInitialized = true;
+        state.isInitialized = true; // ✅ gate opens only after full user+role is set
       })
       .addCase(refreshUser.rejected, (state, action) => {
         state.loading = false;
         state.user = null;
         state.accessToken = null;
-        state.isInitialized = true;
+        state.isInitialized = true; // ✅ no session confirmed — open gate to /login
         const msg = action.payload as string;
         if (msg !== "NO_SESSION") state.error = msg;
       })
