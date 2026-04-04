@@ -1,46 +1,25 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { fetchNotices } from "../../store/slices/noticeSlice";
 import { fetchEvents } from "../../store/slices/eventSlice";
 import { fetchCeremonyInfo } from "../../store/slices/swearingPreferenceSlice";
-import { fetchGalleryAdmin } from "../../store/slices/gallerySlice"; // IMPORTED
+import { fetchGalleryAdmin } from "../../store/slices/gallerySlice";
 import {
-  FileText,
-  Calendar,
-  MapPin,
-  Loader2,
-  Activity,
-  ArrowRight,
-  Clock,
-  Lock,
-  ShieldCheck,
-  History,
-  Unlock,
-  Presentation as PresentationIcon,
-  Image as ImageIcon,
+  FileText, Calendar, MapPin, Loader2, Activity, ArrowRight,
+  Clock, Lock, ShieldCheck, History, Unlock,
+  Presentation as PresentationIcon, Image as ImageIcon,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { type INotice } from "../../store/slices/noticeSlice";
 
 /* --- Institutional Theme Stat Card --- */
 const StatCard = ({
-  title,
-  value,
-  subtext,
-  loading,
-  urgent = false,
-  locked = false,
-  showBadge = false,
-  badgeText = "",
+  title, value, subtext, loading, urgent = false,
+  locked = false, showBadge = false, badgeText = "",
 }: {
-  title: string;
-  value: string | number;
-  subtext: string;
-  loading?: boolean;
-  urgent?: boolean;
-  locked?: boolean;
-  showBadge?: boolean;
-  badgeText?: string;
+  title: string; value: string | number; subtext: string;
+  loading?: boolean; urgent?: boolean; locked?: boolean;
+  showBadge?: boolean; badgeText?: string;
 }) => (
   <div className={`bg-white border-l-4 ${locked ? 'border-l-slate-300' : urgent ? 'border-l-[#C5A059]' : 'border-l-[#355E3B]'} border border-slate-200 p-6 rounded-sm relative overflow-hidden group transition-all duration-300 shadow-sm hover:shadow-md h-full`}>
     {showBadge && (
@@ -59,6 +38,7 @@ const StatCard = ({
       {locked ? <Lock size={10} className="text-slate-400" /> : <Unlock size={10} className="text-[#C5A059]" />}
     </p>
     <div className="flex items-baseline gap-2">
+      {/* ✅ Only show spinner on first load (no existing data), not on background refresh */}
       {loading ? (
         <Loader2 className="animate-spin text-[#355E3B]" size={24} />
       ) : (
@@ -75,35 +55,47 @@ const StatCard = ({
 
 const DrDashboard = () => {
   const dispatch = useAppDispatch();
+  const initialLoadDone = useRef(false); // ✅ track if first load is complete
 
-  // Selectors
   const { user } = useAppSelector((state) => state.auth);
   const { notices, loading: noticesLoading } = useAppSelector((state) => state.notices);
   const { events, loading: eventsLoading } = useAppSelector((state) => state.events);
   const { judges, presentations, loading: ceremonyLoading } = useAppSelector((state) => state.ceremony);
-  
-  // FIXED: Select gallery items and loading state from gallerySlice
   const { items: galleryItems, loading: galleryLoading } = useAppSelector((state) => state.gallery);
   const galleryCount = galleryItems?.length || 0;
 
   /* -------------------- DATA FETCHING -------------------- */
   useEffect(() => {
-    dispatch(fetchNotices(undefined));
-    dispatch(fetchEvents({ filter: "ALL" }));
-    dispatch(fetchCeremonyInfo());
-    dispatch(fetchGalleryAdmin()); // FETCH GALLERY DATA
+    // ✅ Initial load — fetch everything once
+    Promise.all([
+      dispatch(fetchNotices(undefined)),
+      dispatch(fetchEvents({ filter: "ALL" })),
+      dispatch(fetchCeremonyInfo()),
+      dispatch(fetchGalleryAdmin()),
+    ]).then(() => {
+      initialLoadDone.current = true;
+    });
 
+    // ✅ Background refresh — silent, won't trigger loading states if you add
+    //    a 'silent' flag to your thunks (see note below)
     const refreshInterval = setInterval(() => {
       dispatch(fetchEvents({ filter: "ALL" }));
       dispatch(fetchCeremonyInfo());
       dispatch(fetchGalleryAdmin());
-    }, 60000); 
+    }, 60000);
 
     return () => clearInterval(refreshInterval);
   }, [dispatch]);
 
-  /* -------------------- LOGIC -------------------- */
-  
+  /* -------------------- DERIVED STATE -------------------- */
+
+  // ✅ Only show loading spinners on FIRST load, not background refreshes
+  const isFirstLoad = !initialLoadDone.current;
+  const showNoticesLoading  = noticesLoading  && notices.length === 0;
+  const showEventsLoading   = eventsLoading   && events.length === 0;
+  const showCeremonyLoading = ceremonyLoading && (judges?.length || 0) === 0;
+  const showGalleryLoading  = galleryLoading  && galleryCount === 0;
+
   const lastLoginFormatted = useMemo(() => {
     if (!user?.lastLogin) return "First session";
     return new Date(user.lastLogin).toLocaleString('en-GB', {
@@ -127,19 +119,19 @@ const DrDashboard = () => {
     });
   }, [notices]);
 
-  const urgentNoticesCount = useMemo(() => {
-    return activeNotices.filter((n) => n.priority === "URGENT").length;
-  }, [activeNotices]);
+  const urgentNoticesCount = useMemo(() =>
+    activeNotices.filter((n) => n.priority === "URGENT").length,
+  [activeNotices]);
 
-  const sortedNotices = useMemo(() => {
-    return [...activeNotices]
+  const sortedNotices = useMemo(() =>
+    [...activeNotices]
       .sort((a, b) => {
         if (a.priority === "URGENT" && b.priority !== "URGENT") return -1;
         if (a.priority !== "URGENT" && b.priority === "URGENT") return 1;
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       })
-      .slice(0, 5);
-  }, [activeNotices]);
+      .slice(0, 5),
+  [activeNotices]);
 
   const displayEvent = useMemo(() => {
     if (!events || events.length === 0) return null;
@@ -160,34 +152,42 @@ const DrDashboard = () => {
   const startDate = displayEvent ? new Date(displayEvent.startDate) : null;
   const endDate = displayEvent ? new Date(displayEvent.endDate) : null;
   const isMultiDay = startDate && endDate && startDate.toDateString() !== endDate.toDateString();
-
-  const formatDateLabel = (date: Date) => {
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
-
   const totalResources = (judges?.length || 0) + (presentations?.length || 0);
+
+  const formatDateLabel = (date: Date) =>
+    date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  // ✅ Full page skeleton only on very first load before ANY data arrives
+  if (isFirstLoad && showEventsLoading && showNoticesLoading) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center gap-4">
+        <Loader2 className="animate-spin text-[#355E3B]" size={36} />
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">
+          Loading Registry...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-slate-800 p-4 md:p-8 font-sans">
       <div className="max-w-7xl mx-auto space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        
+
         {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-6 gap-4">
-          
           <div className="space-y-2">
-            
             <h1 className="text-3xl md:text-4xl font-serif text-[#355E3B] font-black">
               Welcome, <span className="capitalize">Hon. {displayName}</span>
             </h1>
             <div className="flex flex-wrap items-center gap-4 text-slate-500">
-               <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold uppercase tracking-wider border border-slate-200">
-                  <ShieldCheck size={12} className="text-[#355E3B]" />
-                  Registrar Access
-               </div>
-               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">
-                  <History size={12} className="text-[#C5A059]" />
-                  Last Activity: <span className="text-slate-700">{lastLoginFormatted}</span>
-               </div>
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold uppercase tracking-wider border border-slate-200">
+                <ShieldCheck size={12} className="text-[#355E3B]" />
+                Registrar Access
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">
+                <History size={12} className="text-[#C5A059]" />
+                Last Activity: <span className="text-slate-700">{lastLoginFormatted}</span>
+              </div>
             </div>
           </div>
           <div className="text-left hidden md:block">
@@ -205,19 +205,17 @@ const DrDashboard = () => {
               title="Notices"
               value={activeNotices.length}
               subtext={urgentNoticesCount > 0 ? `${urgentNoticesCount} Pending Actions` : "Admin Overview"}
-              loading={noticesLoading && notices.length === 0}
+              loading={showNoticesLoading}   // ✅ only true before first data
               urgent={urgentNoticesCount > 0}
             />
           </Link>
 
-          {/* FIXED GALLERY CARD */}
           <Link to="/dr/gallery">
             <StatCard
               title="Gallery"
               value={galleryCount}
               subtext="Registry Archive"
-              loading={galleryLoading}
-              urgent={false}
+              loading={showGalleryLoading}   // ✅ only true before first data
               locked={galleryCount === 0}
             />
           </Link>
@@ -227,7 +225,7 @@ const DrDashboard = () => {
               title="Events Calendar"
               value={events.length}
               subtext="Institutional Schedule"
-              loading={eventsLoading && events.length === 0}
+              loading={showEventsLoading}    // ✅ only true before first data
               showBadge={hasNewEvent}
               badgeText="EVENT UPDATE"
             />
@@ -238,7 +236,7 @@ const DrDashboard = () => {
               title="Programme & Files"
               value={totalResources}
               subtext={`${judges?.length || 0} Judicial Profiles`}
-              loading={ceremonyLoading && totalResources === 0}
+              loading={showCeremonyLoading}  // ✅ only true before first data
               urgent={totalResources > 0}
               locked={totalResources === 0}
             />
@@ -247,25 +245,28 @@ const DrDashboard = () => {
 
         {/* CONTENT GRID */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+
           {/* FEATURED EVENT CARD */}
           <div className="lg:col-span-2 bg-white border border-slate-200 rounded-sm p-6 md:p-8 shadow-sm relative">
-             <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
-                {isOngoing ? <Activity className="text-red-600 animate-pulse" size={22} /> : <Calendar className="text-[#C5A059]" size={22} />}
+                {isOngoing
+                  ? <Activity className="text-red-600 animate-pulse" size={22} />
+                  : <Calendar className="text-[#C5A059]" size={22} />}
                 <h2 className="text-[#355E3B] font-serif text-2xl font-black">
                   {isOngoing ? "Active Proceedings" : "Upcoming Event"}
                 </h2>
               </div>
               {hasNewEvent && (
                 <Link to="/dr/events" className="hidden sm:flex items-center gap-2 bg-[#355E3B] text-[#C5A059] px-3 py-1.5 rounded-sm border border-[#C5A059]/30 hover:bg-[#2a4b2f] transition-all group">
-                   <span className="text-[10px] font-black uppercase tracking-widest">Update Registry</span>
-                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Update Registry</span>
+                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </Link>
               )}
             </div>
 
-            {eventsLoading && events.length === 0 ? (
+            {/* ✅ Only show loader when no data exists yet */}
+            {showEventsLoading ? (
               <div className="py-20 flex flex-col items-center justify-center text-slate-400">
                 <Loader2 className="animate-spin mb-4" size={32} />
                 <p className="text-[10px] font-black uppercase tracking-widest">Accessing Registry Logs...</p>
@@ -285,7 +286,9 @@ const DrDashboard = () => {
                       </>
                     )}
                   </div>
-                  <p className="text-white/50 text-[10px] font-bold mt-2 border-t border-white/10 pt-2">{startDate.getFullYear()}</p>
+                  <p className="text-white/50 text-[10px] font-bold mt-2 border-t border-white/10 pt-2">
+                    {startDate.getFullYear()}
+                  </p>
                 </div>
 
                 <div className="space-y-6 flex-1">
@@ -316,15 +319,15 @@ const DrDashboard = () => {
                   </div>
                   <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
                     <div className="flex items-start gap-3">
-                        <MapPin size={18} className="text-[#C5A059] shrink-0" />
-                        <div>
-                          <p className="text-[10px] uppercase font-bold text-slate-400">Designated Venue</p>
-                          <p className="font-bold text-sm text-slate-700">{displayEvent.location || "TBD"}</p>
-                        </div>
+                      <MapPin size={18} className="text-[#C5A059] shrink-0" />
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-slate-400">Designated Venue</p>
+                        <p className="font-bold text-sm text-slate-700">{displayEvent.location || "TBD"}</p>
+                      </div>
                     </div>
                     {displayEvent.isMandatory && (
                       <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 px-3 py-1 rounded-sm font-bold text-[9px] uppercase tracking-tighter">
-                         <Activity size={14} /> Registrar Oversight Req.
+                        <Activity size={14} /> Registrar Oversight Req.
                       </div>
                     )}
                   </div>
@@ -339,24 +342,24 @@ const DrDashboard = () => {
 
             {/* Quick Access */}
             <div className="mt-8 pt-6 border-t border-slate-100 grid grid-cols-2 gap-4">
-               <Link to="/dr/gallery" className="flex items-center gap-3 p-3 bg-slate-50 rounded hover:bg-slate-100 transition-all border border-slate-200/50">
-                  <div className="p-2 bg-[#355E3B] text-[#C5A059] rounded">
-                    <ImageIcon size={16} />
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-black text-slate-400 uppercase">Gallery</p>
-                    <p className="text-xs font-bold text-[#355E3B]">View Gallery</p>
-                  </div>
-               </Link>
-               <Link to="/dr/documents" className="flex items-center gap-3 p-3 bg-slate-50 rounded hover:bg-slate-100 transition-all border border-slate-200/50">
-                  <div className="p-2 bg-[#C5A059] text-white rounded">
-                    <PresentationIcon size={16} />
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-black text-slate-400 uppercase">Documents</p>
-                    <p className="text-xs font-bold text-[#355E3B]">{presentations?.length || 0} Files</p>
-                  </div>
-               </Link>
+              <Link to="/dr/gallery" className="flex items-center gap-3 p-3 bg-slate-50 rounded hover:bg-slate-100 transition-all border border-slate-200/50">
+                <div className="p-2 bg-[#355E3B] text-[#C5A059] rounded">
+                  <ImageIcon size={16} />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase">Gallery</p>
+                  <p className="text-xs font-bold text-[#355E3B]">View Gallery</p>
+                </div>
+              </Link>
+              <Link to="/dr/documents" className="flex items-center gap-3 p-3 bg-slate-50 rounded hover:bg-slate-100 transition-all border border-slate-200/50">
+                <div className="p-2 bg-[#C5A059] text-white rounded">
+                  <PresentationIcon size={16} />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase">Documents</p>
+                  <p className="text-xs font-bold text-[#355E3B]">{presentations?.length || 0} Files</p>
+                </div>
+              </Link>
             </div>
           </div>
 

@@ -1,21 +1,14 @@
-import React, { useEffect, useState, useMemo, type JSX } from "react";
+import React, { useEffect, useState, useMemo, useRef, type JSX } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import HTMLFlipBook from "react-pageflip";
 import {
-  ChevronRight,
-  X,
-  Download,
-  Loader2,
-  FileText,
-  Film,
-  Image as ImageIcon,
-  Play,
+  ChevronRight, X, Download, Loader2, FileText,
+  Film, Image as ImageIcon, Play,
 } from "lucide-react";
 import type { AppDispatch, RootState } from "../../store/store";
 import { fetchProgram } from "../../store/slices/programSlice";
 import type { AudienceRole } from "../../store/slices/programSlice";
 import { fetchCeremonyInfo, type Judge } from "../../store/slices/swearingPreferenceSlice";
-// Import the new presentation thunk and types
 import { fetchPresentations, type Presentation } from "../../store/slices/presentationSlice";
 
 import CoverP from "../../assets/CoverP.png";
@@ -30,7 +23,6 @@ const formatName = (str: string) => {
   const mixedHonors: Record<string, string> = {
     DR: "Dr.", "DR.": "Dr.", RTD: "Rtd", "RTD.": "Rtd.", "H.E": "H.E.", "H.E.": "H.E.",
   };
-
   return str
     .split(" ")
     .map((word) => {
@@ -48,11 +40,7 @@ const formatName = (str: string) => {
 ===================================================== */
 const PresentationCard: React.FC<{ pres: Presentation }> = ({ pres }) => {
   const isVideo = pres.fileType === "video";
-
-  const handleDownload = () => {
-    // Uses the downloadUrl from the new slice which handles tracking on the backend
-    window.open(pres.downloadUrl, "_blank");
-  };
+  const handleDownload = () => window.open(pres.downloadUrl, "_blank");
 
   return (
     <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm hover:shadow-md hover:border-[#355E3B]/30 transition-all duration-200 flex flex-col gap-4">
@@ -124,32 +112,24 @@ Page.displayName = "Page";
 const JudgesReligion = () => {
   const dispatch = useDispatch<AppDispatch>();
 
-  // ── Auth & Selectors ──────────────────────────────────────────────────
-  const userRole = useSelector(
-    (state: RootState) => state.auth.user?.role as AudienceRole | undefined
-  );
-
-  const { program, loading: programLoading } = useSelector(
-    (state: RootState) => state.program
-  );
-
-  // Selector for Judges (original slice)
-  const { 
-    judges, 
-    loading: ceremonyLoading,
-  } = useSelector((state: RootState) => state.ceremony);
-
-  // Selector for Presentations (NEW SLICE)
-  const {
-    items: presentations,
-    loading: presLoading,
-  } = useSelector((state: RootState) => state.presentations);
+  const userRole = useSelector((state: RootState) => state.auth.user?.role as AudienceRole | undefined);
+  const { program, loading: programLoading } = useSelector((state: RootState) => state.program);
+  const { judges, loading: ceremonyLoading } = useSelector((state: RootState) => state.ceremony);
+  const { items: presentations, loading: presLoading } = useSelector((state: RootState) => state.presentations);
 
   const [activeTab, setActiveTab] = useState("PROGRAM");
   const [selectedJudge, setSelectedJudge] = useState<Judge | null>(null);
   const [bookSize, setBookSize] = useState({ width: 450, height: 630 });
 
-  // ── Responsive book sizing ───────────────────────────────────────────
+  // ✅ Track whether we've already fetched — prevents re-fetch on return-to-page
+  const fetchedRef = useRef(false);
+
+  // ✅ Derived: only show spinners when there's truly no data yet
+  const showProgramLoading  = programLoading  && !program;
+  const showCeremonyLoading = ceremonyLoading && judges.length === 0;
+  const showPresLoading     = presLoading     && presentations.length === 0;
+
+  // ── Responsive book sizing ─────────────────────────────────────────
   useEffect(() => {
     const updateSize = () => {
       const w = window.innerWidth < 640 ? window.innerWidth - 32 : 480;
@@ -160,16 +140,18 @@ const JudgesReligion = () => {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  // ── Initial data fetch ───────────────────────────────────────────────
+  // ── Initial data fetch — fires once when role is available ──────────
   useEffect(() => {
-    if (userRole === undefined) return; 
+    // ✅ Wait for role, but only fetch ONCE ever (not on every re-render or return)
+    if (userRole === undefined || fetchedRef.current) return;
+    fetchedRef.current = true;
+
     dispatch(fetchCeremonyInfo(userRole));
     dispatch(fetchProgram(userRole));
-    // Fetch presentations using the new slice thunk
     dispatch(fetchPresentations());
   }, [dispatch, userRole]);
 
-  // ── Flipbook Logic ──────────────────────────────────────────────────
+  // ── Flipbook key (stable, won't remount on tab switch) ─────────────
   const flipbookKey = useMemo(() => {
     if (!program?.schedule) return "loading";
     return `fb-${program.schedule.length}-${program.isLocked ? "L" : "U"}-${program.targetAudience}`;
@@ -180,7 +162,7 @@ const JudgesReligion = () => {
     let pageCounter = 1;
 
     pages.push(
-      <Page key="cover" number={pageCounter++} isCover={true}>
+      <Page key="cover" number={pageCounter++} isCover>
         <img src={CoverP} alt="Cover" className="w-full h-full object-cover" />
       </Page>
     );
@@ -212,7 +194,7 @@ const JudgesReligion = () => {
     }
 
     pages.push(
-      <Page key="back-cover" number={pageCounter++} isCover={true}>
+      <Page key="back-cover" number={pageCounter++} isCover>
         <img src={Back} alt="Back" className="w-full h-full object-cover" />
       </Page>
     );
@@ -226,7 +208,7 @@ const JudgesReligion = () => {
         <div className="flex flex-col h-full">
           <header className="border-b-2 border-[#355E3B]/20 pb-3 mb-4 shrink-0">
             <h2 className="text-[#355E3B] font-serif text-base font-bold uppercase">
-              Day {day.day} {isCont && <span className="text-[#C5A059] ml-2 text-[10px] italic">(Cont.)</span>}
+              Day {day.day}{isCont && <span className="text-[#C5A059] ml-2 text-[10px] italic">(Cont.)</span>}
             </h2>
             <p className="text-[#C5A059] text-[9px] font-black uppercase tracking-widest">
               {day.date ? new Date(day.date).toLocaleDateString("en-KE", { day: "numeric", month: "long", year: "numeric" }) : ""}
@@ -289,10 +271,14 @@ const JudgesReligion = () => {
       </header>
 
       <main className="flex-1 overflow-y-auto p-4 sm:p-12 bg-[#F8FAFC]/30">
+
+        {/* ✅ All tabs rendered always — hidden via CSS, not unmounted */}
+        {/* This prevents remount flicker when switching tabs */}
+
         {/* ── PROGRAM TAB ── */}
-        {activeTab === "PROGRAM" && (
+        <div className={activeTab === "PROGRAM" ? "block" : "hidden"}>
           <div className="max-w-5xl mx-auto flex flex-col items-center">
-            {programLoading ? (
+            {showProgramLoading ? (
               <div className="py-20"><Loader2 className="animate-spin text-[#355E3B]" size={32} /></div>
             ) : !program ? (
               <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -302,20 +288,37 @@ const JudgesReligion = () => {
             ) : (
               <div key={flipbookKey} className="relative animate-in fade-in duration-700">
                 {/* @ts-ignore */}
-                <HTMLFlipBook width={bookSize.width} height={bookSize.height} size="fixed" drawShadow={true} usePortrait={true} mobileScrollSupport={true} className="book-container shadow-2xl" startPage={0}>
+                <HTMLFlipBook
+                  width={bookSize.width}
+                  height={bookSize.height}
+                  size="fixed"
+                  drawShadow={true}
+                  usePortrait={true}
+                  mobileScrollSupport={true}
+                  className="book-container shadow-2xl"
+                  startPage={0}
+                >
                   {programPages}
                 </HTMLFlipBook>
               </div>
             )}
           </div>
-        )}
+        </div>
 
         {/* ── BIO TAB ── */}
-        {activeTab === "BIO" && (
+        <div className={activeTab === "BIO" ? "block" : "hidden"}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            {ceremonyLoading && <Loader2 className="animate-spin mx-auto col-span-full" />}
-            {!ceremonyLoading && judges.map((judge) => (
-              <div key={judge._id} onClick={() => setSelectedJudge(judge)} className="cursor-pointer bg-white border border-slate-200 p-4 rounded-3xl flex items-center gap-5 hover:border-[#C5A059] transition-all group shadow-sm">
+            {showCeremonyLoading && (
+              <div className="col-span-full flex justify-center py-20">
+                <Loader2 className="animate-spin text-[#355E3B]" size={32} />
+              </div>
+            )}
+            {!showCeremonyLoading && judges.map((judge) => (
+              <div
+                key={judge._id}
+                onClick={() => setSelectedJudge(judge)}
+                className="cursor-pointer bg-white border border-slate-200 p-4 rounded-3xl flex items-center gap-5 hover:border-[#C5A059] transition-all group shadow-sm"
+              >
                 <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 border border-slate-100">
                   <img src={judge.imageUrl} className="w-full h-full object-cover" alt="" />
                 </div>
@@ -327,13 +330,15 @@ const JudgesReligion = () => {
               </div>
             ))}
           </div>
-        )}
+        </div>
 
         {/* ── PRESENTATION TAB ── */}
-        {activeTab === "PRESENTATION" && (
+        <div className={activeTab === "PRESENTATION" ? "block" : "hidden"}>
           <div className="max-w-6xl mx-auto">
-            {presLoading ? (
-              <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#355E3B]" size={32} /></div>
+            {showPresLoading ? (
+              <div className="flex justify-center py-20">
+                <Loader2 className="animate-spin text-[#355E3B]" size={32} />
+              </div>
             ) : presentations.length === 0 ? (
               <div className="text-center py-20 text-slate-400">No materials available</div>
             ) : (
@@ -344,7 +349,7 @@ const JudgesReligion = () => {
               </div>
             )}
           </div>
-        )}
+        </div>
       </main>
 
       <BioModal isOpen={!!selectedJudge} onClose={() => setSelectedJudge(null)} data={selectedJudge} />
@@ -360,7 +365,9 @@ const BioModal: React.FC<{ isOpen: boolean; onClose: () => void; data: Judge | n
   return (
     <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/95 backdrop-blur-md">
       <div className="relative bg-white w-full max-w-5xl rounded-t-[2.5rem] sm:rounded-[2rem] overflow-hidden shadow-2xl max-h-[95vh] flex flex-col md:flex-row">
-        <button onClick={onClose} className="absolute top-4 right-4 z-[60] p-2.5 bg-black/40 text-white rounded-full transition-transform active:scale-95"><X size={20} /></button>
+        <button onClick={onClose} className="absolute top-4 right-4 z-[60] p-2.5 bg-black/40 text-white rounded-full transition-transform active:scale-95">
+          <X size={20} />
+        </button>
         <div className="relative w-full md:w-[45%] bg-slate-200 shrink-0 h-[40vh] md:h-auto">
           <img src={data.imageUrl} className="absolute inset-0 w-full h-full object-cover object-top" alt="" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#1a2e1d] via-[#1a2e1d]/20 to-transparent opacity-90" />
