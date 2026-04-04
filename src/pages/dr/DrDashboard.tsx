@@ -38,7 +38,6 @@ const StatCard = ({
       {locked ? <Lock size={10} className="text-slate-400" /> : <Unlock size={10} className="text-[#C5A059]" />}
     </p>
     <div className="flex items-baseline gap-2">
-      {/* ✅ Only show spinner on first load (no existing data), not on background refresh */}
       {loading ? (
         <Loader2 className="animate-spin text-[#355E3B]" size={24} />
       ) : (
@@ -53,9 +52,32 @@ const StatCard = ({
   </div>
 );
 
+/* --- Marquee Banner --- */
+const MarqueeBanner = () => (
+  <div className="overflow-hidden bg-[#355E3B] rounded-sm py-2.5">
+    <div
+      className="flex whitespace-nowrap"
+      style={{ animation: "marquee 35s linear infinite" }}
+    >
+      {[0, 1].map((i) => (
+        <span key={i} className="flex items-center gap-6 mx-8 shrink-0">
+          <span className="text-[#C5A059] text-[10px] font-black uppercase tracking-[0.3em]">
+            ✦ Transforming Court Registries: Enhancing Efficiency, Accountability and Service Delivery.
+          </span>
+          <span className="text-[#C5A059]/40 text-[10px]">✦</span>
+          <span className="text-[#C5A059] text-[10px] font-black uppercase tracking-[0.3em]">
+            High Court of Kenya — Office of the Registrar
+          </span>
+          <span className="text-[#C5A059]/40 text-[10px]">✦</span>
+        </span>
+      ))}
+    </div>
+  </div>
+);
+
 const DrDashboard = () => {
   const dispatch = useAppDispatch();
-  const initialLoadDone = useRef(false); // ✅ track if first load is complete
+  const initialLoadDone = useRef(false);
 
   const { user } = useAppSelector((state) => state.auth);
   const { notices, loading: noticesLoading } = useAppSelector((state) => state.notices);
@@ -66,7 +88,6 @@ const DrDashboard = () => {
 
   /* -------------------- DATA FETCHING -------------------- */
   useEffect(() => {
-    // ✅ Initial load — fetch everything once
     Promise.all([
       dispatch(fetchNotices(undefined)),
       dispatch(fetchEvents({ filter: "ALL" })),
@@ -76,8 +97,6 @@ const DrDashboard = () => {
       initialLoadDone.current = true;
     });
 
-    // ✅ Background refresh — silent, won't trigger loading states if you add
-    //    a 'silent' flag to your thunks (see note below)
     const refreshInterval = setInterval(() => {
       dispatch(fetchEvents({ filter: "ALL" }));
       dispatch(fetchCeremonyInfo());
@@ -88,8 +107,6 @@ const DrDashboard = () => {
   }, [dispatch]);
 
   /* -------------------- DERIVED STATE -------------------- */
-
-  // ✅ Only show loading spinners on FIRST load, not background refreshes
   const isFirstLoad = !initialLoadDone.current;
   const showNoticesLoading  = noticesLoading  && notices.length === 0;
   const showEventsLoading   = eventsLoading   && events.length === 0;
@@ -157,7 +174,6 @@ const DrDashboard = () => {
   const formatDateLabel = (date: Date) =>
     date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  // ✅ Full page skeleton only on very first load before ANY data arrives
   if (isFirstLoad && showEventsLoading && showNoticesLoading) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center gap-4">
@@ -170,237 +186,253 @@ const DrDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-slate-800 p-4 md:p-8 font-sans">
-      <div className="max-w-7xl mx-auto space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <>
+      {/* ✅ Marquee keyframe injected once at root level */}
+      <style>{`
+        @keyframes marquee {
+          0%   { transform: translateX(0%); }
+          100% { transform: translateX(-50%); }
+        }
+      `}</style>
 
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-6 gap-4">
-          <div className="space-y-2">
-            <h1 className="text-3xl md:text-4xl font-serif text-[#355E3B] font-black">
-              Welcome, <span className="capitalize">Hon. {displayName}</span>
-            </h1>
-            <div className="flex flex-wrap items-center gap-4 text-slate-500">
-              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold uppercase tracking-wider border border-slate-200">
-                <ShieldCheck size={12} className="text-[#355E3B]" />
-                Registrar Access
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">
-                <History size={12} className="text-[#C5A059]" />
-                Last Activity: <span className="text-slate-700">{lastLoginFormatted}</span>
-              </div>
-            </div>
-          </div>
-          <div className="text-left hidden md:block">
-            <p className="text-[10px] font-bold text-slate-400 uppercase">Current Session</p>
-            <p className="text-sm font-serif font-bold text-[#355E3B]">
-              {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-            </p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-[#F8F9FA] text-slate-800 font-sans">
 
-        {/* STATS ROW */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          <Link to="/dr/notice">
-            <StatCard
-              title="Notices"
-              value={activeNotices.length}
-              subtext={urgentNoticesCount > 0 ? `${urgentNoticesCount} Pending Actions` : "Admin Overview"}
-              loading={showNoticesLoading}   // ✅ only true before first data
-              urgent={urgentNoticesCount > 0}
-            />
-          </Link>
+        {/* SCROLLING BANNER — full width, above everything */}
+        <MarqueeBanner />
 
-          <Link to="/dr/gallery">
-            <StatCard
-              title="Gallery"
-              value={galleryCount}
-              subtext="Registry Archive"
-              loading={showGalleryLoading}   // ✅ only true before first data
-              locked={galleryCount === 0}
-            />
-          </Link>
+        <div className="p-4 md:p-8">
+          <div className="max-w-7xl mx-auto space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
-          <Link to="/dr/events">
-            <StatCard
-              title="Events Calendar"
-              value={events.length}
-              subtext="Institutional Schedule"
-              loading={showEventsLoading}    // ✅ only true before first data
-              showBadge={hasNewEvent}
-              badgeText="EVENT UPDATE"
-            />
-          </Link>
-
-          <Link to="/dr/programme">
-            <StatCard
-              title="Programme & Files"
-              value={totalResources}
-              subtext={`${judges?.length || 0} Judicial Profiles`}
-              loading={showCeremonyLoading}  // ✅ only true before first data
-              urgent={totalResources > 0}
-              locked={totalResources === 0}
-            />
-          </Link>
-        </div>
-
-        {/* CONTENT GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-          {/* FEATURED EVENT CARD */}
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-sm p-6 md:p-8 shadow-sm relative">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                {isOngoing
-                  ? <Activity className="text-red-600 animate-pulse" size={22} />
-                  : <Calendar className="text-[#C5A059]" size={22} />}
-                <h2 className="text-[#355E3B] font-serif text-2xl font-black">
-                  {isOngoing ? "Active Proceedings" : "Upcoming Event"}
-                </h2>
-              </div>
-              {hasNewEvent && (
-                <Link to="/dr/events" className="hidden sm:flex items-center gap-2 bg-[#355E3B] text-[#C5A059] px-3 py-1.5 rounded-sm border border-[#C5A059]/30 hover:bg-[#2a4b2f] transition-all group">
-                  <span className="text-[10px] font-black uppercase tracking-widest">Update Registry</span>
-                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                </Link>
-              )}
-            </div>
-
-            {/* ✅ Only show loader when no data exists yet */}
-            {showEventsLoading ? (
-              <div className="py-20 flex flex-col items-center justify-center text-slate-400">
-                <Loader2 className="animate-spin mb-4" size={32} />
-                <p className="text-[10px] font-black uppercase tracking-widest">Accessing Registry Logs...</p>
-              </div>
-            ) : displayEvent && startDate && endDate ? (
-              <div className="flex flex-col md:flex-row gap-8 items-start mb-4 animate-in fade-in duration-500">
-                <div className={`${isOngoing ? 'bg-red-900' : 'bg-[#355E3B]'} p-6 text-center min-w-[150px] w-full md:w-auto rounded-sm shadow-md`}>
-                  <p className="text-[#C5A059] text-[11px] uppercase font-black tracking-widest mb-1">
-                    {startDate.toLocaleString("en-us", { month: "short" }).toUpperCase()}
-                  </p>
-                  <div className="flex items-center justify-center gap-1 text-white font-serif font-black">
-                    <span className="text-5xl">{startDate.getDate()}</span>
-                    {isMultiDay && (
-                      <>
-                        <span className="text-2xl text-white/30 mx-1">-</span>
-                        <span className="text-4xl text-[#C5A059]">{endDate.getDate()}</span>
-                      </>
-                    )}
+            {/* HEADER */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-6 gap-4">
+              <div className="space-y-2">
+                <h1 className="text-3xl md:text-4xl font-serif text-[#355E3B] font-black">
+                  Welcome, <span className="capitalize">Hon. {displayName}</span>
+                </h1>
+                <div className="flex flex-wrap items-center gap-4 text-slate-500">
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold uppercase tracking-wider border border-slate-200">
+                    <ShieldCheck size={12} className="text-[#355E3B]" />
+                    Registrar Access
                   </div>
-                  <p className="text-white/50 text-[10px] font-bold mt-2 border-t border-white/10 pt-2">
-                    {startDate.getFullYear()}
-                  </p>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">
+                    <History size={12} className="text-[#C5A059]" />
+                    Last Activity: <span className="text-slate-700">{lastLoginFormatted}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-left hidden md:block">
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Current Session</p>
+                <p className="text-sm font-serif font-bold text-[#355E3B]">
+                  {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+              </div>
+            </div>
+
+            {/* STATS ROW */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+              <Link to="/dr/notice">
+                <StatCard
+                  title="Notices"
+                  value={activeNotices.length}
+                  subtext={urgentNoticesCount > 0 ? `${urgentNoticesCount} Pending Actions` : "Admin Overview"}
+                  loading={showNoticesLoading}
+                  urgent={urgentNoticesCount > 0}
+                />
+              </Link>
+
+              <Link to="/dr/gallery">
+                <StatCard
+                  title="Gallery"
+                  value={galleryCount}
+                  subtext="Registry Archive"
+                  loading={showGalleryLoading}
+                  locked={galleryCount === 0}
+                />
+              </Link>
+
+              <Link to="/dr/events">
+                <StatCard
+                  title="Events Calendar"
+                  value={events.length}
+                  subtext="Institutional Schedule"
+                  loading={showEventsLoading}
+                  showBadge={hasNewEvent}
+                  badgeText="EVENT UPDATE"
+                />
+              </Link>
+
+              <Link to="/dr/programme">
+                <StatCard
+                  title="Programme & Files"
+                  value={totalResources}
+                  subtext={`${judges?.length || 0} Judicial Profiles`}
+                  loading={showCeremonyLoading}
+                  urgent={totalResources > 0}
+                  locked={totalResources === 0}
+                />
+              </Link>
+            </div>
+
+            {/* CONTENT GRID */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+              {/* FEATURED EVENT CARD */}
+              <div className="lg:col-span-2 bg-white border border-slate-200 rounded-sm p-6 md:p-8 shadow-sm relative">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-3">
+                    {isOngoing
+                      ? <Activity className="text-red-600 animate-pulse" size={22} />
+                      : <Calendar className="text-[#C5A059]" size={22} />}
+                    <h2 className="text-[#355E3B] font-serif text-2xl font-black">
+                      {isOngoing ? "Active Proceedings" : "Upcoming Event"}
+                    </h2>
+                  </div>
+                  {hasNewEvent && (
+                    <Link to="/dr/events" className="hidden sm:flex items-center gap-2 bg-[#355E3B] text-[#C5A059] px-3 py-1.5 rounded-sm border border-[#C5A059]/30 hover:bg-[#2a4b2f] transition-all group">
+                      <span className="text-[10px] font-black uppercase tracking-widest">Update Registry</span>
+                      <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  )}
                 </div>
 
-                <div className="space-y-6 flex-1">
-                  <div>
-                    <h3 className="text-[#355E3B] text-2xl font-serif font-black leading-tight mb-3">
-                      {displayEvent.title}
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-y border-slate-50 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-slate-50 rounded-full text-[#C5A059]">
-                          <Clock size={14} />
-                        </div>
-                        <div>
-                          <p className="text-[9px] uppercase font-black text-slate-400">Registry Start</p>
-                          <p className="text-xs font-bold text-slate-700">{formatDateLabel(startDate)}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-slate-50 rounded-full text-slate-300">
-                          <ArrowRight size={14} />
-                        </div>
-                        <div>
-                          <p className="text-[9px] uppercase font-black text-slate-400">End Time</p>
-                          <p className="text-xs font-bold text-slate-700">{formatDateLabel(endDate)}</p>
-                        </div>
-                      </div>
-                    </div>
+                {showEventsLoading ? (
+                  <div className="py-20 flex flex-col items-center justify-center text-slate-400">
+                    <Loader2 className="animate-spin mb-4" size={32} />
+                    <p className="text-[10px] font-black uppercase tracking-widest">Accessing Registry Logs...</p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
-                    <div className="flex items-start gap-3">
-                      <MapPin size={18} className="text-[#C5A059] shrink-0" />
+                ) : displayEvent && startDate && endDate ? (
+                  <div className="flex flex-col md:flex-row gap-8 items-start mb-4 animate-in fade-in duration-500">
+                    <div className={`${isOngoing ? 'bg-red-900' : 'bg-[#355E3B]'} p-6 text-center min-w-[150px] w-full md:w-auto rounded-sm shadow-md`}>
+                      <p className="text-[#C5A059] text-[11px] uppercase font-black tracking-widest mb-1">
+                        {startDate.toLocaleString("en-us", { month: "short" }).toUpperCase()}
+                      </p>
+                      <div className="flex items-center justify-center gap-1 text-white font-serif font-black">
+                        <span className="text-5xl">{startDate.getDate()}</span>
+                        {isMultiDay && (
+                          <>
+                            <span className="text-2xl text-white/30 mx-1">-</span>
+                            <span className="text-4xl text-[#C5A059]">{endDate.getDate()}</span>
+                          </>
+                        )}
+                      </div>
+                      <p className="text-white/50 text-[10px] font-bold mt-2 border-t border-white/10 pt-2">
+                        {startDate.getFullYear()}
+                      </p>
+                    </div>
+
+                    <div className="space-y-6 flex-1">
                       <div>
-                        <p className="text-[10px] uppercase font-bold text-slate-400">Designated Venue</p>
-                        <p className="font-bold text-sm text-slate-700">{displayEvent.location || "TBD"}</p>
+                        <h3 className="text-[#355E3B] text-2xl font-serif font-black leading-tight mb-3">
+                          {displayEvent.title}
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-y border-slate-50 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-slate-50 rounded-full text-[#C5A059]">
+                              <Clock size={14} />
+                            </div>
+                            <div>
+                              <p className="text-[9px] uppercase font-black text-slate-400">Registry Start</p>
+                              <p className="text-xs font-bold text-slate-700">{formatDateLabel(startDate)}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-slate-50 rounded-full text-slate-300">
+                              <ArrowRight size={14} />
+                            </div>
+                            <div>
+                              <p className="text-[9px] uppercase font-black text-slate-400">End Time</p>
+                              <p className="text-xs font-bold text-slate-700">{formatDateLabel(endDate)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+                        <div className="flex items-start gap-3">
+                          <MapPin size={18} className="text-[#C5A059] shrink-0" />
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-slate-400">Designated Venue</p>
+                            <p className="font-bold text-sm text-slate-700">{displayEvent.location || "TBD"}</p>
+                          </div>
+                        </div>
+                        {displayEvent.isMandatory && (
+                          <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 px-3 py-1 rounded-sm font-bold text-[9px] uppercase tracking-tighter">
+                            <Activity size={14} /> Registrar Oversight Req.
+                          </div>
+                        )}
                       </div>
                     </div>
-                    {displayEvent.isMandatory && (
-                      <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 px-3 py-1 rounded-sm font-bold text-[9px] uppercase tracking-tighter">
-                        <Activity size={14} /> Registrar Oversight Req.
-                      </div>
-                    )}
                   </div>
-                </div>
-              </div>
-            ) : (
-              <div className="py-16 text-center border border-dashed border-slate-200 rounded-sm bg-slate-50/50">
-                <Calendar className="mx-auto text-slate-300 mb-4" size={40} />
-                <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No pending assignments</p>
-              </div>
-            )}
+                ) : (
+                  <div className="py-16 text-center border border-dashed border-slate-200 rounded-sm bg-slate-50/50">
+                    <Calendar className="mx-auto text-slate-300 mb-4" size={40} />
+                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No pending assignments</p>
+                  </div>
+                )}
 
-            {/* Quick Access */}
-            <div className="mt-8 pt-6 border-t border-slate-100 grid grid-cols-2 gap-4">
-              <Link to="/dr/gallery" className="flex items-center gap-3 p-3 bg-slate-50 rounded hover:bg-slate-100 transition-all border border-slate-200/50">
-                <div className="p-2 bg-[#355E3B] text-[#C5A059] rounded">
-                  <ImageIcon size={16} />
-                </div>
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase">Gallery</p>
-                  <p className="text-xs font-bold text-[#355E3B]">View Gallery</p>
-                </div>
-              </Link>
-              <Link to="/dr/documents" className="flex items-center gap-3 p-3 bg-slate-50 rounded hover:bg-slate-100 transition-all border border-slate-200/50">
-                <div className="p-2 bg-[#C5A059] text-white rounded">
-                  <PresentationIcon size={16} />
-                </div>
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase">Documents</p>
-                  <p className="text-xs font-bold text-[#355E3B]">{presentations?.length || 0} Files</p>
-                </div>
-              </Link>
-            </div>
-          </div>
-
-          {/* NOTICES SIDEBAR */}
-          <div className="bg-white border border-slate-200 rounded-sm p-6 md:p-8 shadow-sm flex flex-col">
-            <div className="flex items-center gap-3 mb-8">
-              <FileText className="text-[#C5A059]" size={20} />
-              <h2 className="text-[#355E3B] font-serif text-xl font-black">Recent Notices</h2>
-            </div>
-            <div className="space-y-6 flex-1">
-              {sortedNotices.length > 0 ? (
-                sortedNotices.map((notice) => (
-                  <div key={notice._id} className="group cursor-pointer border-b border-slate-50 pb-4 last:border-0 hover:bg-slate-50/50 transition-colors">
-                    <h4 className="text-slate-700 text-[13px] font-bold group-hover:text-[#355E3B] transition-colors line-clamp-2 leading-snug">
-                      {notice.title}
-                    </h4>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-slate-400 text-[9px] font-black uppercase">
-                        {new Date(notice.createdAt).toLocaleDateString('en-GB')}
-                      </span>
-                      <span className={`${notice.priority === 'URGENT' ? 'text-red-600 bg-red-50 border-red-100' : 'text-[#C5A059] bg-[#C5A059]/5 border-transparent'} text-[9px] font-black uppercase tracking-tighter px-2 py-0.5 border`}>
-                        {notice.priority}
-                      </span>
+                {/* Quick Access */}
+                <div className="mt-8 pt-6 border-t border-slate-100 grid grid-cols-2 gap-4">
+                  <Link to="/dr/gallery" className="flex items-center gap-3 p-3 bg-slate-50 rounded hover:bg-slate-100 transition-all border border-slate-200/50">
+                    <div className="p-2 bg-[#355E3B] text-[#C5A059] rounded">
+                      <ImageIcon size={16} />
                     </div>
-                  </div>
-                ))
-              ) : (
-                <div className="py-10 text-center">
-                  <p className="text-slate-300 text-xs italic font-medium">
-                    {noticesLoading ? "Syncing Briefs..." : "Clear Registry."}
-                  </p>
+                    <div>
+                      <p className="text-[9px] font-black text-slate-400 uppercase">Gallery</p>
+                      <p className="text-xs font-bold text-[#355E3B]">View Gallery</p>
+                    </div>
+                  </Link>
+                  <Link to="/dr/documents" className="flex items-center gap-3 p-3 bg-slate-50 rounded hover:bg-slate-100 transition-all border border-slate-200/50">
+                    <div className="p-2 bg-[#C5A059] text-white rounded">
+                      <PresentationIcon size={16} />
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black text-slate-400 uppercase">Documents</p>
+                      <p className="text-xs font-bold text-[#355E3B]">{presentations?.length || 0} Files</p>
+                    </div>
+                  </Link>
                 </div>
-              )}
+              </div>
+
+              {/* NOTICES SIDEBAR */}
+              <div className="bg-white border border-slate-200 rounded-sm p-6 md:p-8 shadow-sm flex flex-col">
+                <div className="flex items-center gap-3 mb-8">
+                  <FileText className="text-[#C5A059]" size={20} />
+                  <h2 className="text-[#355E3B] font-serif text-xl font-black">Recent Notices</h2>
+                </div>
+                <div className="space-y-6 flex-1">
+                  {sortedNotices.length > 0 ? (
+                    sortedNotices.map((notice) => (
+                      <div key={notice._id} className="group cursor-pointer border-b border-slate-50 pb-4 last:border-0 hover:bg-slate-50/50 transition-colors">
+                        <h4 className="text-slate-700 text-[13px] font-bold group-hover:text-[#355E3B] transition-colors line-clamp-2 leading-snug">
+                          {notice.title}
+                        </h4>
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-slate-400 text-[9px] font-black uppercase">
+                            {new Date(notice.createdAt).toLocaleDateString('en-GB')}
+                          </span>
+                          <span className={`${notice.priority === 'URGENT' ? 'text-red-600 bg-red-50 border-red-100' : 'text-[#C5A059] bg-[#C5A059]/5 border-transparent'} text-[9px] font-black uppercase tracking-tighter px-2 py-0.5 border`}>
+                            {notice.priority}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-10 text-center">
+                      <p className="text-slate-300 text-xs italic font-medium">
+                        {noticesLoading ? "Syncing Briefs..." : "Clear Registry."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <Link to="/dr/notice" className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#355E3B] hover:text-[#C5A059] transition-all group">
+                  Audit Notices <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </div>
             </div>
-            <Link to="/dr/notice" className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#355E3B] hover:text-[#C5A059] transition-all group">
-              Audit Notices <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-            </Link>
+
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
