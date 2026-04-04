@@ -61,7 +61,7 @@ const MarqueeBanner = () => (
     >
       {[0, 1].map((i) => (
         <span key={i} className="flex items-center gap-6 mx-8 shrink-0">
-          <span className="text-[#C5A059] text-[10px] font-black uppercase tracking-[0.3em]">
+          <span className="text-[#C5A059] text-[10px] font-serif font-black uppercase tracking-[0.3em]">
             ✦ Transforming Court Registries: Enhancing Efficiency, Accountability and Service Delivery.
           </span>
           <span className="text-[#C5A059]/40 text-[10px]">✦</span>
