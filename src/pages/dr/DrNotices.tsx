@@ -166,8 +166,7 @@ const DrNotices = () => {
                     {notice.title}
                   </h3>
 
-                  {/* FULL DESCRIPTION — no truncation */}
-                  <div className="description-container mb-10 max-w-5xl">
+                  <div className="description-container mb-10 max-w-5xl line-clamp-3 lg:line-clamp-none">
                     {renderFormattedDescription(notice.description)}
                   </div>
 
@@ -183,7 +182,7 @@ const DrNotices = () => {
                       <div className="flex items-center gap-2">
                         <User size={14} className="text-[#c2a336]" />
                         <p className="text-[10px] font-bold text-slate-500 uppercase">
-                          {notice.createdBy?.name || "Registry System"}
+                          {notice.createdBy?.name || "System Admin"}
                         </p>
                       </div>
                     </div>
