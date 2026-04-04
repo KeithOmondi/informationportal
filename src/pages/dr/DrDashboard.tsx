@@ -284,12 +284,12 @@ const DrDashboard = () => {
                       ? <Activity className="text-red-600 animate-pulse" size={22} />
                       : <Calendar className="text-[#C5A059]" size={22} />}
                     <h2 className="text-[#355E3B] font-serif text-2xl font-black">
-                      {isOngoing ? "Active Proceedings" : "Upcoming Event"}
+                      {isOngoing ? "Active Events" : "Upcoming Event"}
                     </h2>
                   </div>
                   {hasNewEvent && (
                     <Link to="/dr/events" className="hidden sm:flex items-center gap-2 bg-[#355E3B] text-[#C5A059] px-3 py-1.5 rounded-sm border border-[#C5A059]/30 hover:bg-[#2a4b2f] transition-all group">
-                      <span className="text-[10px] font-black uppercase tracking-widest">Update Registry</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest">View More</span>
                       <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                     </Link>
                   )}
@@ -298,7 +298,7 @@ const DrDashboard = () => {
                 {showEventsLoading ? (
                   <div className="py-20 flex flex-col items-center justify-center text-slate-400">
                     <Loader2 className="animate-spin mb-4" size={32} />
-                    <p className="text-[10px] font-black uppercase tracking-widest">Accessing Registry Logs...</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest">Accessing Logs...</p>
                   </div>
                 ) : displayEvent && startDate && endDate ? (
                   <div className="flex flex-col md:flex-row gap-8 items-start mb-4 animate-in fade-in duration-500">
@@ -365,7 +365,7 @@ const DrDashboard = () => {
                 ) : (
                   <div className="py-16 text-center border border-dashed border-slate-200 rounded-sm bg-slate-50/50">
                     <Calendar className="mx-auto text-slate-300 mb-4" size={40} />
-                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No pending assignments</p>
+                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No pending Evnts</p>
                   </div>
                 )}
 
@@ -418,7 +418,7 @@ const DrDashboard = () => {
                   ) : (
                     <div className="py-10 text-center">
                       <p className="text-slate-300 text-xs italic font-medium">
-                        {noticesLoading ? "Syncing Briefs..." : "Clear Registry."}
+                        {noticesLoading ? "Syncing Notices..." : "No uploads found."}
                       </p>
                     </div>
                   )}
