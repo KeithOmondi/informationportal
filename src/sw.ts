@@ -13,29 +13,58 @@ declare global {
   }
 }
 
-import { clientsClaim, skipWaiting } from 'workbox-core' // 👈 added skipWaiting
+import { clientsClaim } from 'workbox-core'
 import { precacheAndRoute } from 'workbox-precaching'
 import { registerRoute } from 'workbox-routing'
-import { NetworkFirst } from 'workbox-strategies'
+import { NetworkFirst, NetworkOnly } from 'workbox-strategies'
 import { replayPendingRequests } from './lib/syncManager'
 
-skipWaiting()  // 👈 skip waiting phase — activate immediately
-clientsClaim() // 👈 take control of all open tabs
+// ✅ Controlled activation — skip waiting on install only, then claim clients
+self.addEventListener('install', () => {
+  self.skipWaiting()
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    Promise.all([
+      // ✅ Take control of all open tabs immediately after activation
+      clientsClaim(),
+      // ✅ Purge old caches on every new SW activation
+      caches.keys().then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => !['api-cache-v2'].includes(key))
+            .map((key) => caches.delete(key))
+        )
+      ),
+    ])
+  )
+})
 
 // Precache all assets injected by vite-plugin-pwa
 precacheAndRoute(self.__WB_MANIFEST)
 
-// Runtime caching for your API
+// ✅ Auth endpoints — NEVER cache, always hit the network directly
 registerRoute(
-  ({ url }) => url.href.startsWith(import.meta.env.VITE_API_URL),
+  ({ url }) =>
+    url.href.startsWith(import.meta.env.VITE_API_URL) &&
+    url.pathname.includes('/auth/'),
+  new NetworkOnly()
+)
+
+// ✅ All other API routes — NetworkFirst with cache fallback
+registerRoute(
+  ({ url }) =>
+    url.href.startsWith(import.meta.env.VITE_API_URL) &&
+    !url.pathname.includes('/auth/'),
   new NetworkFirst({
-    cacheName: 'api-cache',
+    cacheName: 'api-cache-v2',
     networkTimeoutSeconds: 10,
     plugins: [
       {
         cacheKeyWillBeUsed: async ({ request }) => request.url,
-      }
-    ]
+      },
+    ],
   })
 )
 
@@ -52,7 +81,7 @@ self.addEventListener('push', (event: PushEvent) => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: '/icon/pwa-192.png'
+      icon: '/icon/pwa-192.png',
     })
   )
 })
