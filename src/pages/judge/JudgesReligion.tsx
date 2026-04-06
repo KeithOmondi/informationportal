@@ -79,7 +79,7 @@ const ReleaseCountdown: React.FC<{ targetDate: string }> = ({ targetDate }) => {
         <Lock className="text-[#355E3B]" size={32} />
       </div>
       <h2 className="text-[#355E3B] font-serif text-xl font-bold uppercase mb-2 text-center">Program Locked</h2>
-      <p className="text-slate-500 text-xs text-center mb-8 font-medium">The digital program will be available in:</p>
+      <p className="text-slate-500 text-xs text-center mb-8 font-medium">The Program will be available in:</p>
       
       <div className="flex divide-x divide-slate-100">
         <TimeUnit value={timeLeft.days} label="Days" />
