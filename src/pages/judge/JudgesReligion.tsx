@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import HTMLFlipBook from "react-pageflip";
 import {
   ChevronRight, X, Download, Loader2, FileText,
-  Film, Image as ImageIcon, Play,
+  Film, Image as ImageIcon, Play, Lock, Clock
 } from "lucide-react";
 import type { AppDispatch, RootState } from "../../store/store";
 import { fetchProgram } from "../../store/slices/programSlice";
@@ -33,6 +33,69 @@ const formatName = (str: string) => {
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     })
     .join(" ");
+};
+
+/* =====================================================
+    COUNTDOWN COMPONENT
+===================================================== */
+const ReleaseCountdown: React.FC<{ targetDate: string }> = ({ targetDate }) => {
+  const [timeLeft, setTimeLeft] = useState({
+    days: 0, hours: 0, minutes: 0, seconds: 0, expired: false
+  });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const distance = new Date(targetDate).getTime() - now;
+
+      if (distance < 0) {
+        setTimeLeft(prev => ({ ...prev, expired: true }));
+        clearInterval(timer);
+      } else {
+        setTimeLeft({
+          days: Math.floor(distance / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+          minutes: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
+          seconds: Math.floor((distance % (1000 * 60)) / 1000),
+          expired: false
+        });
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [targetDate]);
+
+  const TimeUnit = ({ value, label }: { value: number, label: string }) => (
+    <div className="flex flex-col items-center px-4">
+      <span className="text-3xl sm:text-5xl font-serif font-bold text-[#355E3B]">
+        {String(value).padStart(2, '0')}
+      </span>
+      <span className="text-[10px] font-black uppercase tracking-widest text-[#C5A059] mt-1">{label}</span>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-6 bg-white border border-slate-100 rounded-[2rem] shadow-xl max-w-md mx-auto animate-in zoom-in duration-500">
+      <div className="p-4 bg-[#355E3B]/5 rounded-full mb-6">
+        <Lock className="text-[#355E3B]" size={32} />
+      </div>
+      <h2 className="text-[#355E3B] font-serif text-xl font-bold uppercase mb-2 text-center">Program Locked</h2>
+      <p className="text-slate-500 text-xs text-center mb-8 font-medium">The digital program will be available in:</p>
+      
+      <div className="flex divide-x divide-slate-100">
+        <TimeUnit value={timeLeft.days} label="Days" />
+        <TimeUnit value={timeLeft.hours} label="Hrs" />
+        <TimeUnit value={timeLeft.minutes} label="Min" />
+        <TimeUnit value={timeLeft.seconds} label="Sec" />
+      </div>
+
+      <div className="mt-10 flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-full border border-slate-100">
+        <Clock size={14} className="text-[#C5A059]" />
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+          Release: {new Date(targetDate).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })}
+        </span>
+      </div>
+    </div>
+  );
 };
 
 /* =====================================================
@@ -121,15 +184,12 @@ const JudgesReligion = () => {
   const [selectedJudge, setSelectedJudge] = useState<Judge | null>(null);
   const [bookSize, setBookSize] = useState({ width: 450, height: 630 });
 
-  // ✅ Track whether we've already fetched — prevents re-fetch on return-to-page
   const fetchedRef = useRef(false);
 
-  // ✅ Derived: only show spinners when there's truly no data yet
   const showProgramLoading  = programLoading  && !program;
   const showCeremonyLoading = ceremonyLoading && judges.length === 0;
   const showPresLoading     = presLoading     && presentations.length === 0;
 
-  // ── Responsive book sizing ─────────────────────────────────────────
   useEffect(() => {
     const updateSize = () => {
       const w = window.innerWidth < 640 ? window.innerWidth - 32 : 480;
@@ -140,9 +200,7 @@ const JudgesReligion = () => {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  // ── Initial data fetch — fires once when role is available ──────────
   useEffect(() => {
-    // ✅ Wait for role, but only fetch ONCE ever (not on every re-render or return)
     if (userRole === undefined || fetchedRef.current) return;
     fetchedRef.current = true;
 
@@ -151,7 +209,6 @@ const JudgesReligion = () => {
     dispatch(fetchPresentations());
   }, [dispatch, userRole]);
 
-  // ── Flipbook key (stable, won't remount on tab switch) ─────────────
   const flipbookKey = useMemo(() => {
     if (!program?.schedule) return "loading";
     return `fb-${program.schedule.length}-${program.isLocked ? "L" : "U"}-${program.targetAudience}`;
@@ -161,6 +218,7 @@ const JudgesReligion = () => {
     const pages: JSX.Element[] = [];
     let pageCounter = 1;
 
+    // Cover
     pages.push(
       <Page key="cover" number={pageCounter++} isCover>
         <img src={CoverP} alt="Cover" className="w-full h-full object-cover" />
@@ -193,6 +251,7 @@ const JudgesReligion = () => {
       });
     }
 
+    // Back Cover
     pages.push(
       <Page key="back-cover" number={pageCounter++} isCover>
         <img src={Back} alt="Back" className="w-full h-full object-cover" />
@@ -272,9 +331,6 @@ const JudgesReligion = () => {
 
       <main className="flex-1 overflow-y-auto p-4 sm:p-12 bg-[#F8FAFC]/30">
 
-        {/* ✅ All tabs rendered always — hidden via CSS, not unmounted */}
-        {/* This prevents remount flicker when switching tabs */}
-
         {/* ── PROGRAM TAB ── */}
         <div className={activeTab === "PROGRAM" ? "block" : "hidden"}>
           <div className="max-w-5xl mx-auto flex flex-col items-center">
@@ -285,7 +341,13 @@ const JudgesReligion = () => {
                 <FileText size={24} className="text-slate-300 mb-4" />
                 <p className="text-slate-500 font-bold text-sm">Program not available</p>
               </div>
+            ) : program.isLocked ? (
+              /* ✅ SHOW COUNTDOWN IF LOCKED (NO COVERS) */
+              <div className="py-12 w-full">
+                <ReleaseCountdown targetDate={program.scheduledRelease} />
+              </div>
             ) : (
+              /* ✅ SHOW FLIPBOOK IF UNLOCKED */
               <div key={flipbookKey} className="relative animate-in fade-in duration-700">
                 {/* @ts-ignore */}
                 <HTMLFlipBook
