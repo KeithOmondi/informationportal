@@ -11,8 +11,8 @@ import type { AudienceRole } from "../../store/slices/programSlice";
 import { fetchCeremonyInfo, type Judge } from "../../store/slices/swearingPreferenceSlice";
 import { fetchPresentations, type Presentation } from "../../store/slices/presentationSlice";
 
-import CoverP from "../../assets/CoverP.png";
-import Back from "../../assets/Back.png";
+import DrCover from "../../assets/DrCover.png";
+import DrBack from "../../assets/DrBack.png";
 
 /* =====================================================
     HELPERS
@@ -221,7 +221,7 @@ const DrProgramme = () => {
     // Cover
     pages.push(
       <Page key="cover" number={pageCounter++} isCover>
-        <img src={CoverP} alt="Cover" className="w-full h-full object-cover" />
+        <img src={DrCover} alt="Cover" className="w-full h-full object-cover" />
       </Page>
     );
 
@@ -254,7 +254,7 @@ const DrProgramme = () => {
     // Back Cover
     pages.push(
       <Page key="back-cover" number={pageCounter++} isCover>
-        <img src={Back} alt="Back" className="w-full h-full object-cover" />
+        <img src={DrBack} alt="Back" className="w-full h-full object-cover" />
       </Page>
     );
 
