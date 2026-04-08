@@ -7,6 +7,8 @@ import {
   User,
   Inbox,
   CheckCircle,
+  X, // Added for closing modal
+  Maximize2,
 } from "lucide-react";
 import debounce from "lodash/debounce";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
@@ -23,6 +25,7 @@ const DrNotices = () => {
 
   const [filter, setFilter] = useState<"ALL" | NoticePriority>("ALL");
   const [search, setSearch] = useState("");
+  const [selectedNotice, setSelectedNotice] = useState<any | null>(null); // State for Modal
 
   const categories: ("ALL" | NoticePriority)[] = ["ALL", "NORMAL", "URGENT"];
 
@@ -46,19 +49,19 @@ const DrNotices = () => {
     return `${(size / (1024 * 1024)).toFixed(2)} MB`;
   };
 
-  const renderFormattedDescription = (text: string) => {
+  const renderFormattedDescription = (text: string, isModal: boolean = false) => {
     return text.split("\n").map((line, i) => {
       const trimmedLine = line.trim();
       if (trimmedLine.startsWith("-") || trimmedLine.startsWith("*") || trimmedLine.startsWith("•")) {
         return (
-          <li key={i} className="ml-5 list-disc text-slate-600 mb-1 pl-2 text-sm font-medium">
+          <li key={i} className={`ml-5 list-disc text-slate-600 mb-1 pl-2 font-medium ${isModal ? "text-base" : "text-sm"}`}>
             {trimmedLine.substring(1).trim()}
           </li>
         );
       }
       if (trimmedLine === "") return <div key={i} className="h-3" />;
       return (
-        <p key={i} className="mb-2 text-slate-600 leading-relaxed text-sm font-medium">
+        <p key={i} className={`mb-2 text-slate-600 leading-relaxed font-medium ${isModal ? "text-base" : "text-sm"}`}>
           {line}
         </p>
       );
@@ -66,13 +69,13 @@ const DrNotices = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 lg:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans">
+    <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 lg:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans">
       
       {/* HEADER */}
       <div className="border-b border-slate-200 pb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="text-left">
           <h1 className="text-[#1a3a32] font-serif text-2xl md:text-2xl font-black mb-2 tracking-tight">
-          Notice Board
+            Notice Board
           </h1>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-[#c2a336]" />
@@ -136,7 +139,6 @@ const DrNotices = () => {
                   isRead ? "border-slate-100 opacity-90" : "border-[#1a3a32]/10 shadow-sm shadow-[#1a3a32]/5"
                 }`}
               >
-                {/* UNREAD STATUS DOT INDICATOR */}
                 {!isRead && (
                   <div className="absolute top-8 left-0 w-1.5 h-12 bg-[#c2a336] rounded-r-full shadow-[2px_0_10px_rgba(194,163,54,0.4)]" />
                 )}
@@ -162,12 +164,21 @@ const DrNotices = () => {
                     </span>
                   </div>
 
-                  <h3 className={`font-serif text-2xl font-black leading-tight mb-6 ${isRead ? "text-slate-600" : "text-[#1a3a32]"}`}>
+                  <h3 className={`font-serif text-2xl font-black leading-tight mb-4 ${isRead ? "text-slate-600" : "text-[#1a3a32]"}`}>
                     {notice.title}
                   </h3>
 
-                  <div className="description-container mb-10 max-w-5xl line-clamp-3 lg:line-clamp-none">
-                    {renderFormattedDescription(notice.description)}
+                  {/* Truncated Description with View More */}
+                  <div className="relative mb-6">
+                    <div className="max-w-5xl line-clamp-3 overflow-hidden">
+                      {renderFormattedDescription(notice.description)}
+                    </div>
+                    <button 
+                      onClick={() => setSelectedNotice(notice)}
+                      className="mt-4 flex items-center gap-2 text-[#c2a336] hover:text-[#1a3a32] transition-colors text-[10px] font-black uppercase tracking-widest"
+                    >
+                      <Maximize2 size={14} /> View Full Notice
+                    </button>
                   </div>
 
                   {/* FOOTER ACTION AREA */}
@@ -219,6 +230,58 @@ const DrNotices = () => {
           Office of the Registrar High Court • Information Portal
         </p>
       </div>
+
+      {/* MODAL OVERLAY */}
+      {selectedNotice && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#1a3a32]/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-3xl max-h-[90vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            {/* Modal Header */}
+            <div className="p-8 border-b border-slate-100 flex items-start justify-between">
+              <div>
+                <span className={`text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border mb-4 inline-block ${
+                  selectedNotice.priority === "URGENT" ? "bg-red-50 text-red-600 border-red-100" : "bg-[#1a3a32]/5 text-[#1a3a32] border-[#1a3a32]/10"
+                }`}>
+                  {selectedNotice.priority}
+                </span>
+                <h2 className="text-[#1a3a32] font-serif text-2xl font-black leading-tight">
+                  {selectedNotice.title}
+                </h2>
+              </div>
+              <button 
+                onClick={() => setSelectedNotice(null)}
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-8 overflow-y-auto flex-1">
+              <div className="max-w-none">
+                {renderFormattedDescription(selectedNotice.description, true)}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-8 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+               <div className="flex items-center gap-4">
+                  <Calendar size={14} className="text-[#c2a336]" />
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    Posted: {new Date(selectedNotice.createdAt).toLocaleDateString('en-KE')}
+                  </p>
+               </div>
+               {selectedNotice.attachments?.length > 0 && (
+                 <button
+                    onClick={() => dispatch(downloadNotice(selectedNotice._id))}
+                    className="flex items-center gap-3 px-8 py-3 bg-[#1a3a32] text-white rounded-xl hover:bg-[#1a3a32]/90 transition-all font-bold text-[10px] uppercase tracking-widest"
+                  >
+                    <Download size={16} /> Download PDF
+                  </button>
+               )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
