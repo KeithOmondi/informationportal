@@ -9,6 +9,36 @@ import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { fetchCourtInfo } from "../../store/slices/courtInformationSlice";
 
 /* =====================================================
+    TYPES & INTERFACES
+===================================================== */
+
+interface CourtContent {
+  type: "IMAGE" | "TEXT";
+  url?: string;
+  body?: string;
+}
+
+interface Division {
+  _id: string;
+  name: string;
+  title: string;
+  content: CourtContent[];
+}
+
+interface FAQ {
+  _id: string;
+  question: string;
+  answer: string;
+}
+
+interface Contact {
+  _id: string;
+  title: string;
+  detail: string;
+  sub?: string;
+}
+
+/* =====================================================
     REUSABLE SUB-COMPONENTS
 ===================================================== */
 
@@ -28,7 +58,7 @@ const ContactCard: React.FC<{
   return (
     <div className="bg-white border border-slate-300 p-6 md:p-8 rounded-none text-center group hover:bg-slate-50 transition-all duration-300 shadow-sm">
       <div className="text-[#355E3B] mb-4 flex justify-center">
-        {React.cloneElement(getIcon(), { className: "text-[#C5A059]" })}
+        {React.cloneElement(getIcon(), { className: "text-[#C5A059]" } as React.SVGProps<SVGSVGElement>)}
       </div>
       <h3 className="text-[#355E3B] text-[10px] font-black uppercase tracking-[0.2em] mb-3">
         {title}
@@ -45,7 +75,14 @@ const ContactCard: React.FC<{
 
 const CourtInformation: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { divisions, faqs, contacts } = useAppSelector((state) => state.court);
+  
+  // Cast state types if the slice doesn't export them directly
+  const { divisions, faqs, contacts } = useAppSelector((state) => state.court) as {
+    divisions: Division[];
+    faqs: FAQ[];
+    contacts: Contact[];
+  };
+
   const [openFaq, setOpenFaq] = useState<string | null>(null);
 
   useEffect(() => {
@@ -71,18 +108,17 @@ const CourtInformation: React.FC = () => {
       {leadData && (
         <section className="bg-white rounded-b-[0.5rem] border border-slate-200 overflow-hidden shadow-sm flex flex-col md:flex-row border-t-0">
           
-          {/* IMAGE BLOCK - Fixed for Mobile */}
+          {/* IMAGE BLOCK */}
           <div className="relative w-full md:w-[40%] bg-slate-100 shrink-0">
             <div className="aspect-[1/1] sm:aspect-[4/3] md:h-full w-full">
               <img
-                src={leadData.content?.find((c: any) => c.type === "IMAGE")?.url}
+                src={leadData.content?.find((c) => c.type === "IMAGE")?.url}
                 className="w-full h-full object-cover object-top grayscale-[20%] hover:grayscale-0 transition-all duration-700"
                 alt={leadData.name}
               />
             </div>
-            {/* Overlay Label - Adjusted for better mobile visibility */}
             <div className="absolute bottom-0 left-0 w-full p-5 md:p-8 bg-gradient-to-t from-[#355E3B] via-[#355E3B]/90 to-transparent md:bg-[#355E3B]/95 md:border-t-4 border-[#C5A059]">
-              <h3 className="text-white text-center font-serif font-bold text-lg md:text-1xl tracking-wide leading-tight">
+              <h3 className="text-white text-center font-serif font-bold text-lg md:text-xl tracking-wide leading-tight">
                 {leadData.name}
               </h3>
               <p className="text-[#C5A059] text-center font-black text-[9px] md:text-[11px] uppercase tracking-[0.2em] mt-1 md:mt-2">
@@ -93,7 +129,6 @@ const CourtInformation: React.FC = () => {
 
           {/* MESSAGE BLOCK */}
           <div className="relative flex-1 p-6 md:p-12 lg:p-16 flex flex-col justify-center">
-            {/* OFFICIAL HEADER STACK */}
             <div className="flex flex-row items-center gap-4 md:gap-6 mb-8 md:mb-12 border-b border-slate-100 pb-6 md:pb-8">
               <img
                 src="https://res.cloudinary.com/drls2cpnu/image/upload/v1772111715/JOB_LOGO_ebsbgu.jpg"
@@ -120,7 +155,7 @@ const CourtInformation: React.FC = () => {
                   Greetings,
                 </p>
                 <div className="text-slate-700 leading-relaxed text-base md:text-lg font-serif whitespace-pre-line text-justify">
-                  {leadData.content?.find((c: any) => c.type === "TEXT")?.body || leadData.content?.[0]?.body}
+                  {leadData.content?.find((c) => c.type === "TEXT")?.body || leadData.content?.[0]?.body}
                 </div>
               </div>
 
@@ -180,7 +215,7 @@ const CourtInformation: React.FC = () => {
       <section className="space-y-1">
         <div className="bg-[#355E3B] p-5 text-center rounded-t-[0.5rem]">
             <h2 className="text-white font-serif text-lg md:text-xl font-bold uppercase tracking-wide">
-               For inquiries please contact
+                For inquiries please contact
             </h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-px bg-slate-200 border border-slate-200">

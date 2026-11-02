@@ -1,4 +1,5 @@
-import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { AxiosError } from "axios";
 import { api } from "../../api/axios";
 
 // --- Interfaces ---
@@ -30,44 +31,49 @@ const initialState: FileState = {
 
 // --- Async Thunks ---
 
-// Matches: GET /get
-export const fetchFiles = createAsyncThunk("files/fetchAll", async (_, thunkAPI) => {
-  try {
-    const response = await api.get("/files/get"); 
-    return response.data;
-  } catch (error: any) {
-    return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch files");
-  }
-});
-
-// Matches: POST /upload
-export const uploadFile = createAsyncThunk(
-  "files/upload",
-  async (file: File, thunkAPI) => {
+export const fetchFiles = createAsyncThunk<FileData[], void, { rejectValue: string }>(
+  "files/fetchAll",
+  async (_, thunkAPI) => {
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await api.post("/files/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const response = await api.get<FileData[]>("/files/get");
       return response.data;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response?.data?.message || "Upload failed");
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch files");
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   }
 );
 
-// Matches: GET /:id/download
-export const downloadFile = createAsyncThunk(
+export const uploadFile = createAsyncThunk<FileData, File, { rejectValue: string }>(
+  "files/upload",
+  async (file, thunkAPI) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await api.post<FileData>("/files/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response.data;
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Upload failed");
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
+    }
+  }
+);
+
+export const downloadFile = createAsyncThunk<string, { id: string; fileName: string }, { rejectValue: string }>(
   "files/download",
-  async ({ id, fileName }: { id: string; fileName: string }, thunkAPI) => {
+  async ({ id, fileName }, thunkAPI) => {
     try {
       const response = await api.get(`/files/${id}/download`, {
-        responseType: "blob", // Important for file downloads
+        responseType: "blob",
       });
 
-      // Logic to trigger browser download
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
@@ -75,23 +81,29 @@ export const downloadFile = createAsyncThunk(
       document.body.appendChild(link);
       link.click();
       link.remove();
-      
+      window.URL.revokeObjectURL(url); // Clean up memory
+
       return id;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response?.data?.message || "Download failed");
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Download failed");
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   }
 );
 
-// Matches: DELETE /:id
-export const deleteFile = createAsyncThunk(
+export const deleteFile = createAsyncThunk<string, string, { rejectValue: string }>(
   "files/delete",
-  async (id: string, thunkAPI) => {
+  async (id, thunkAPI) => {
     try {
       await api.delete(`/files/${id}`);
       return id;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response?.data?.message || "Delete failed");
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Delete failed");
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   }
 );
@@ -113,36 +125,37 @@ const fileSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchFiles.fulfilled, (state, action: PayloadAction<FileData[]>) => {
+      .addCase(fetchFiles.fulfilled, (state, action) => {
         state.loading = false;
         state.files = action.payload;
       })
       .addCase(fetchFiles.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload ?? "Failed to fetch files";
       })
 
       // Upload File
       .addCase(uploadFile.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
-      .addCase(uploadFile.fulfilled, (state, action: PayloadAction<FileData>) => {
+      .addCase(uploadFile.fulfilled, (state, action) => {
         state.loading = false;
         state.files.unshift(action.payload);
       })
       .addCase(uploadFile.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload ?? "Upload failed";
       })
 
       // Delete File
-      .addCase(deleteFile.fulfilled, (state, action: PayloadAction<string>) => {
+      .addCase(deleteFile.fulfilled, (state, action) => {
         state.files = state.files.filter((f) => f._id !== action.payload);
       })
-      
-      // Download File (Optional: track loading state for UI spinners)
+
+      // Download File Rejected
       .addCase(downloadFile.rejected, (state, action) => {
-        state.error = action.payload as string;
+        state.error = action.payload ?? "Download failed";
       });
   },
 });

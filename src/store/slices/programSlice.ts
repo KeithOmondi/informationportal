@@ -2,8 +2,8 @@ import {
   createSlice,
   createAsyncThunk,
   type PayloadAction,
-  type AnyAction,
 } from "@reduxjs/toolkit";
+import { AxiosError } from "axios";
 import { api } from "../../api/axios";
 
 // --- Types ---
@@ -36,11 +36,10 @@ export interface ProgramData {
   programFileUrl?: string;
   isLocked: boolean;
   scheduledRelease: string;
-  targetAudience: AudienceRole;   // <-- NEW
+  targetAudience: AudienceRole;
   updatedAt?: string;
 }
 
-// Admin grouped-view shape from GET /admin/all
 export interface GroupedPrograms {
   total: number;
   grouped: Record<AudienceRole, ProgramData[]>;
@@ -48,7 +47,7 @@ export interface GroupedPrograms {
 
 interface ProgramState {
   program: ProgramData | null;
-  allPrograms: GroupedPrograms | null;  // <-- NEW: for admin overview
+  allPrograms: GroupedPrograms | null;
   loading: boolean;
   isInitialLoading: boolean;
   success: boolean;
@@ -66,115 +65,98 @@ const initialState: ProgramState = {
 
 // --- Thunks ---
 
-/**
- * Public fetch — passes the caller's role so the backend filters accordingly.
- * Role comes from the JWT (req.user.role) on the server, but we also send it
- * as a query param as a fallback for clients that need explicit control.
- */
-export const fetchProgram = createAsyncThunk(
+export const fetchProgram = createAsyncThunk<ProgramData, AudienceRole | undefined, { rejectValue: string }>(
   "program/fetch",
-  async (role: AudienceRole = "all", thunkAPI) => {
+  async (role = "all", thunkAPI) => {
     try {
       const response = await api.get("/program", {
         params: { role },
       });
-      return response.data as ProgramData;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Failed to load program"
-      );
+      return response.data;
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to load program");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
 
-/**
- * Admin single-view — optionally filter by a specific audience.
- * Maps to GET /api/program/admin/view?audience=judge|dr|all
- */
-export const fetchProgramForAdmin = createAsyncThunk(
+export const fetchProgramForAdmin = createAsyncThunk<ProgramData, AudienceRole | undefined, { rejectValue: string }>(
   "program/fetchAdmin",
-  async (audience?: AudienceRole, thunkAPI?) => {
+  async (audience, thunkAPI) => {
     try {
       const response = await api.get("/program/admin/view", {
         params: audience ? { audience } : {},
       });
-      return response.data as ProgramData;
-    } catch (error: any) {
-      return thunkAPI!.rejectWithValue(
-        error.response?.data?.message || "Failed to load admin view"
-      );
+      return response.data;
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to load admin view");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
 
-/**
- * Admin all-programs view grouped by targetAudience.
- * Maps to GET /api/program/admin/all
- */
-export const fetchAllProgramsForAdmin = createAsyncThunk(
+export const fetchAllProgramsForAdmin = createAsyncThunk<GroupedPrograms, void, { rejectValue: string }>(
   "program/fetchAllAdmin",
   async (_, thunkAPI) => {
     try {
       const response = await api.get("/program/admin/all");
-      return response.data as GroupedPrograms;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Failed to load all programs"
-      );
+      return response.data;
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to load all programs");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
 
-/**
- * Create — payload must include targetAudience.
- */
-export const createProgram = createAsyncThunk(
+export const createProgram = createAsyncThunk<ProgramData, Partial<ProgramData> & { targetAudience: AudienceRole }, { rejectValue: string }>(
   "program/create",
-  async (data: Partial<ProgramData> & { targetAudience: AudienceRole }, thunkAPI) => {
+  async (data, thunkAPI) => {
     try {
       const response = await api.post("/program/admin/create", data);
-      return response.data as ProgramData;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Creation failed"
-      );
+      return response.data;
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Creation failed");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
 
-/**
- * Update — targetAudience can be changed alongside other fields.
- */
-export const updateProgram = createAsyncThunk(
+export const updateProgram = createAsyncThunk<ProgramData, { id: string; data: FormData | Partial<ProgramData> }, { rejectValue: string }>(
   "program/update",
-  async (
-    { id, data }: { id: string; data: FormData | Partial<ProgramData> },
-    thunkAPI
-  ) => {
+  async ({ id, data }, thunkAPI) => {
     try {
       const response = await api.patch(`/program/admin/update/${id}`, data, {
-        headers:
-          data instanceof FormData ? { "Content-Type": "multipart/form-data" } : {},
+        headers: data instanceof FormData ? { "Content-Type": "multipart/form-data" } : {},
       });
-      return response.data as ProgramData;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Update failed"
-      );
+      return response.data;
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Update failed");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
 
-export const deleteProgram = createAsyncThunk(
+export const deleteProgram = createAsyncThunk<string, string, { rejectValue: string }>(
   "program/delete",
-  async (id: string, thunkAPI) => {
+  async (id, thunkAPI) => {
     try {
       await api.delete(`/program/admin/delete/${id}`);
       return id;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Delete failed"
-      );
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Delete failed");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
@@ -196,76 +178,55 @@ const programSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // --- Fulfilled ---
-      .addCase(
-        fetchProgram.fulfilled,
-        (state, action: PayloadAction<ProgramData>) => {
-          state.loading = false;
-          state.isInitialLoading = false;
-          state.program = action.payload;
-        }
-      )
-      .addCase(
-        fetchProgramForAdmin.fulfilled,
-        (state, action: PayloadAction<ProgramData>) => {
-          state.loading = false;
-          state.isInitialLoading = false;
-          state.program = action.payload;
-        }
-      )
-      .addCase(
-        fetchAllProgramsForAdmin.fulfilled,
-        (state, action: PayloadAction<GroupedPrograms>) => {
-          state.loading = false;
-          state.isInitialLoading = false;
-          state.allPrograms = action.payload;  // stored separately from single program
-        }
-      )
-      .addCase(
-        createProgram.fulfilled,
-        (state, action: PayloadAction<ProgramData>) => {
-          state.loading = false;
-          state.success = true;
-          state.program = action.payload;
-          // Invalidate grouped cache so admin/all refetches fresh data
-          state.allPrograms = null;
-        }
-      )
-      .addCase(
-        updateProgram.fulfilled,
-        (state, action: PayloadAction<ProgramData>) => {
-          state.loading = false;
-          state.success = true;
-          state.program = action.payload;
-          // If targetAudience changed, grouped cache is stale
-          state.allPrograms = null;
-        }
-      )
+      .addCase(fetchProgram.fulfilled, (state, action) => {
+        state.loading = false;
+        state.isInitialLoading = false;
+        state.program = action.payload;
+      })
+      .addCase(fetchProgramForAdmin.fulfilled, (state, action) => {
+        state.loading = false;
+        state.isInitialLoading = false;
+        state.program = action.payload;
+      })
+      .addCase(fetchAllProgramsForAdmin.fulfilled, (state, action) => {
+        state.loading = false;
+        state.isInitialLoading = false;
+        state.allPrograms = action.payload;
+      })
+      .addCase(createProgram.fulfilled, (state, action) => {
+        state.loading = false;
+        state.success = true;
+        state.program = action.payload;
+        state.allPrograms = null;
+      })
+      .addCase(updateProgram.fulfilled, (state, action) => {
+        state.loading = false;
+        state.success = true;
+        state.program = action.payload;
+        state.allPrograms = null;
+      })
       .addCase(deleteProgram.fulfilled, (state) => {
         state.loading = false;
         state.success = true;
         state.program = null;
         state.allPrograms = null;
       })
-
-      // --- Pending (all thunks) ---
+      // --- Matchers ---
       .addMatcher(
-        (action): action is AnyAction => action.type.endsWith("/pending"),
+        (action) => action.type.endsWith("/pending"),
         (state) => {
           state.loading = true;
           state.error = null;
           state.success = false;
         }
       )
-      // --- Rejected (all thunks) ---
       .addMatcher(
-        (action): action is AnyAction => action.type.endsWith("/rejected"),
-        (state, action: AnyAction) => {
+        (action) => action.type.endsWith("/rejected"),
+        (state, action: PayloadAction<string | undefined>) => {
           state.loading = false;
           state.isInitialLoading = false;
           state.success = false;
-          state.error =
-            (action.payload as string) || "An unexpected error occurred";
+          state.error = action.payload || "An unexpected error occurred";
         }
       );
   },

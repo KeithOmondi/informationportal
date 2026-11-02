@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { fetchNotices } from "../../store/slices/noticeSlice";
 import { fetchEvents } from "../../store/slices/eventSlice";
@@ -77,7 +77,9 @@ const MarqueeBanner = () => (
 
 const DrDashboard = () => {
   const dispatch = useAppDispatch();
-  const initialLoadDone = useRef(false);
+  
+  // FIX: Using state instead of Ref for render-dependent logic
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   const { user } = useAppSelector((state) => state.auth);
   const { notices, loading: noticesLoading } = useAppSelector((state) => state.notices);
@@ -88,16 +90,23 @@ const DrDashboard = () => {
 
   /* -------------------- DATA FETCHING -------------------- */
   useEffect(() => {
-    Promise.all([
-      dispatch(fetchNotices(undefined)),
-      dispatch(fetchEvents({ filter: "ALL" })),
-      dispatch(fetchCeremonyInfo()),
-      dispatch(fetchGalleryAdmin()),
-    ]).then(() => {
-      initialLoadDone.current = true;
-    });
+    const fetchData = async () => {
+      try {
+        await Promise.all([
+          dispatch(fetchNotices(undefined)),
+          dispatch(fetchEvents({ filter: "ALL" })),
+          dispatch(fetchCeremonyInfo()),
+          dispatch(fetchGalleryAdmin()),
+        ]);
+      } finally {
+        setInitialLoadDone(true);
+      }
+    };
+
+    fetchData();
 
     const refreshInterval = setInterval(() => {
+      dispatch(fetchNotices(undefined));
       dispatch(fetchEvents({ filter: "ALL" }));
       dispatch(fetchCeremonyInfo());
       dispatch(fetchGalleryAdmin());
@@ -106,12 +115,11 @@ const DrDashboard = () => {
     return () => clearInterval(refreshInterval);
   }, [dispatch]);
 
-  /* -------------------- DERIVED STATE -------------------- */
-  const isFirstLoad = !initialLoadDone.current;
-  const showNoticesLoading  = noticesLoading  && notices.length === 0;
-  const showEventsLoading   = eventsLoading   && events.length === 0;
+  /* -------------------- DERIVED STATE (PURE) -------------------- */
+  const showNoticesLoading = noticesLoading && notices.length === 0;
+  const showEventsLoading = eventsLoading && events.length === 0;
   const showCeremonyLoading = ceremonyLoading && (judges?.length || 0) === 0;
-  const showGalleryLoading  = galleryLoading  && galleryCount === 0;
+  const showGalleryLoading = galleryLoading && galleryCount === 0;
 
   const lastLoginFormatted = useMemo(() => {
     if (!user?.lastLogin) return "First session";
@@ -122,41 +130,45 @@ const DrDashboard = () => {
 
   const hasNewEvent = useMemo(() => {
     if (!events || events.length === 0) return false;
-    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
-    return events.some(e => new Date(e.createdAt) > fortyEightHoursAgo);
+    const referenceTime = new Date().getTime(); 
+    const fortyEightHoursAgo = referenceTime - 48 * 60 * 60 * 1000;
+    return events.some(e => new Date(e.createdAt).getTime() > fortyEightHoursAgo);
   }, [events]);
 
   const activeNotices = useMemo(() => {
-    const now = new Date();
-    return (notices || []).filter((notice: INotice) => {
+    if (!notices) return [];
+    const referenceTime = new Date().getTime();
+    return notices.filter((notice: INotice) => {
       const isDRTargeted = notice.targetAudience === "DR" || notice.targetAudience === "ALL";
       if (!notice.isActive || !isDRTargeted) return false;
       if (!notice.expiryDate) return true;
-      return new Date(notice.expiryDate) >= now;
+      return new Date(notice.expiryDate).getTime() >= referenceTime;
     });
   }, [notices]);
 
   const urgentNoticesCount = useMemo(() =>
     activeNotices.filter((n) => n.priority === "URGENT").length,
-  [activeNotices]);
+    [activeNotices]);
 
   const sortedNotices = useMemo(() =>
-    [...activeNotices]
+    ([...activeNotices])
       .sort((a, b) => {
         if (a.priority === "URGENT" && b.priority !== "URGENT") return -1;
         if (a.priority !== "URGENT" && b.priority === "URGENT") return 1;
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       })
       .slice(0, 5),
-  [activeNotices]);
+    [activeNotices]);
 
   const displayEvent = useMemo(() => {
     if (!events || events.length === 0) return null;
     const ongoing = events.find(e => e.status === "ONGOING");
     if (ongoing) return ongoing;
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const validEvents = events.filter(e => new Date(e.endDate) >= now);
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const validEvents = events.filter(e => new Date(e.endDate) >= startOfToday);
     return [...validEvents].sort((a, b) => {
       if (a.isMandatory && !b.isMandatory) return -1;
       if (!a.isMandatory && b.isMandatory) return 1;
@@ -174,7 +186,8 @@ const DrDashboard = () => {
   const formatDateLabel = (date: Date) =>
     date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  if (isFirstLoad && showEventsLoading && showNoticesLoading) {
+  // Safety check: Use state 'initialLoadDone' to determine loading view
+  if (!initialLoadDone && (showEventsLoading || showNoticesLoading)) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin text-[#355E3B]" size={36} />
@@ -187,7 +200,6 @@ const DrDashboard = () => {
 
   return (
     <>
-      {/* ✅ Marquee keyframe injected once at root level */}
       <style>{`
         @keyframes marquee {
           0%   { transform: translateX(0%); }
@@ -196,8 +208,6 @@ const DrDashboard = () => {
       `}</style>
 
       <div className="min-h-screen bg-[#F8F9FA] text-slate-800 font-sans">
-
-        {/* SCROLLING BANNER — full width, above everything */}
         <MarqueeBanner />
 
         <div className="p-4 md:p-8">
@@ -275,8 +285,6 @@ const DrDashboard = () => {
 
             {/* CONTENT GRID */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-              {/* FEATURED EVENT CARD */}
               <div className="lg:col-span-2 bg-white border border-slate-200 rounded-sm p-6 md:p-8 shadow-sm relative">
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center gap-3">
@@ -365,11 +373,10 @@ const DrDashboard = () => {
                 ) : (
                   <div className="py-16 text-center border border-dashed border-slate-200 rounded-sm bg-slate-50/50">
                     <Calendar className="mx-auto text-slate-300 mb-4" size={40} />
-                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No pending Evnts</p>
+                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No pending Events</p>
                   </div>
                 )}
 
-                {/* Quick Access */}
                 <div className="mt-8 pt-6 border-t border-slate-100 grid grid-cols-2 gap-4">
                   <Link to="/dr/gallery" className="flex items-center gap-3 p-3 bg-slate-50 rounded hover:bg-slate-100 transition-all border border-slate-200/50">
                     <div className="p-2 bg-[#355E3B] text-[#C5A059] rounded">
@@ -392,7 +399,6 @@ const DrDashboard = () => {
                 </div>
               </div>
 
-              {/* NOTICES SIDEBAR */}
               <div className="bg-white border border-slate-200 rounded-sm p-6 md:p-8 shadow-sm flex flex-col">
                 <div className="flex items-center gap-3 mb-8">
                   <FileText className="text-[#C5A059]" size={20} />
@@ -428,7 +434,6 @@ const DrDashboard = () => {
                 </Link>
               </div>
             </div>
-
           </div>
         </div>
       </div>

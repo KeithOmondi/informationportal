@@ -3,6 +3,7 @@ import {
   createAsyncThunk,
   type PayloadAction,
 } from "@reduxjs/toolkit";
+import { AxiosError } from "axios";
 import { api } from "../../api/axios";
 
 // Helper to convert VAPID string to Uint8Array for the browser
@@ -31,7 +32,12 @@ const initialState: PushState = {
   error: null,
 };
 
-export const subscribeUserToPush = createAsyncThunk(
+// Generics: <ReturnedType, ArgType, ConfigType>
+export const subscribeUserToPush = createAsyncThunk<
+  NotificationPermission,
+  void,
+  { rejectValue: string }
+>(
   "push/subscribe",
   async (_, { rejectWithValue }) => {
     try {
@@ -40,7 +46,7 @@ export const subscribeUserToPush = createAsyncThunk(
         throw new Error("Browser does not support desktop alerts.");
       }
 
-      // 2. Register Service Worker (Ensure sw.js is in your /public folder)
+      // 2. Register Service Worker
       const registration = await navigator.serviceWorker.register("/sw.js");
       await navigator.serviceWorker.ready;
 
@@ -51,29 +57,33 @@ export const subscribeUserToPush = createAsyncThunk(
       }
 
       // 4. Create Subscription
-      // Using Vite's import.meta.env and the conversion helper
       const publicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-      if (!publicKey)
-        throw new Error(
-          "VAPID Public Key is missing in environment variables.",
-        );
+      if (!publicKey) {
+        throw new Error("VAPID Public Key is missing in environment variables.");
+      }
 
-      const subscribeOptions = {
+      const subscribeOptions: PushSubscriptionOptionsInit = {
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),
       };
 
-      const subscription =
-        await registration.pushManager.subscribe(subscribeOptions);
+      const subscription = await registration.pushManager.subscribe(subscribeOptions);
 
       // 5. Send to Backend Route
       await api.post("/users/subscribe", { subscription });
 
       return permission;
-    } catch (err: any) {
-      return rejectWithValue(err.message || "Failed to subscribe");
+    } catch (err: unknown) {
+      // Handle Axios errors vs standard Error objects safely
+      if (err instanceof AxiosError) {
+        return rejectWithValue(err.response?.data?.message || "Server subscription failed");
+      }
+      if (err instanceof Error) {
+        return rejectWithValue(err.message);
+      }
+      return rejectWithValue("An unknown error occurred");
     }
-  },
+  }
 );
 
 const pushSlice = createSlice({
@@ -96,11 +106,12 @@ const pushSlice = createSlice({
           state.loading = false;
           state.permission = action.payload;
           state.isSubscribed = true;
-        },
+        }
       )
       .addCase(subscribeUserToPush.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        // action.payload is now recognized as string | undefined due to rejectValue config
+        state.error = action.payload ?? "Failed to subscribe";
       });
   },
 });

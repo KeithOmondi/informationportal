@@ -100,21 +100,29 @@ const JudgeDashboardPage = () => {
     return () => clearInterval(refreshInterval);
   }, [dispatch]);
 
-  /* -------------------- LOGIC -------------------- */
+  /* -------------------- LOGIC (DERIVED STATE) -------------------- */
   
+// 1. New Events Check 
+const hasNewEvent = useMemo(() => {
+  if (!events || events.length === 0) return false;
+  
+  // We define the "now" reference inside the memo to be used for THIS specific calculation
+  const now = new Date().getTime(); 
+  const fortyEightHoursAgo = now - (48 * 60 * 60 * 1000);
+  
+  return events.some(e => new Date(e.createdAt).getTime() > fortyEightHoursAgo);
+}, [events]);
+
+  // 2. Last Login Formatting (Fixed dependency mismatch for React Compiler)
   const lastLoginFormatted = useMemo(() => {
-    if (!user?.lastLogin) return "First session";
-    return new Date(user.lastLogin).toLocaleString('en-GB', {
+    const loginDate = user?.lastLogin; // Inferred as the stable dependency
+    if (!loginDate) return "First session";
+    return new Date(loginDate).toLocaleString('en-GB', {
       day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
     });
   }, [user?.lastLogin]);
 
-  const hasNewEvent = useMemo(() => {
-    if (!events || events.length === 0) return false;
-    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
-    return events.some(e => new Date(e.createdAt) > fortyEightHoursAgo);
-  }, [events]);
-
+  // 3. Notices Logic
   const activeNotices = useMemo(() => {
     const now = new Date();
     return (notices || []).filter((notice: INotice) => {
@@ -137,11 +145,13 @@ const JudgeDashboardPage = () => {
       .slice(0, 5);
   }, [activeNotices]);
 
+  // 4. Message Stats
   const messageStats = useMemo(() => {
     const unread = (groups || []).reduce((acc, group) => acc + (group.unreadCount || 0), 0);
     return { unread, totalChannels: groups.length };
   }, [groups]);
 
+  // 5. Featured Event Selection
   const displayEvent = useMemo(() => {
     if (!events || events.length === 0) return null;
     const ongoing = events.find(e => e.status === "ONGOING");
@@ -169,7 +179,6 @@ const JudgeDashboardPage = () => {
     return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  // Logic for the New "Ceremony Resources" Card
   const totalResources = (judges?.length || 0) + (presentations?.length || 0);
 
   return (
@@ -346,7 +355,6 @@ const JudgeDashboardPage = () => {
               </div>
             )}
 
-            {/* Quick Access to Resources */}
             <div className="mt-8 pt-6 border-t border-slate-100 grid grid-cols-2 gap-4">
                <Link to="/judge/documents" className="flex items-center gap-3 p-3 bg-slate-50 rounded hover:bg-slate-100 transition-all border border-slate-200/50">
                   <div className="p-2 bg-[#355E3B] text-[#C5A059] rounded">

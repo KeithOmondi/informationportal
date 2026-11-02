@@ -15,8 +15,20 @@ const ForgotPassword = () => {
     try {
       await dispatch(requestPasswordReset(email)).unwrap();
       toast.success("Reset link dispatched.");
-    } catch (err: any) {
-      toast.error(err || "Failed to send link.");
+    } catch (err) {
+      // Logic to extract error message without using 'any'
+      let errorMessage = "Failed to send link.";
+
+      if (typeof err === "string") {
+        errorMessage = err;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (err && typeof err === "object" && "message" in err) {
+        // Specifically for Redux Toolkit rejected values
+        errorMessage = String((err as { message: unknown }).message);
+      }
+
+      toast.error(errorMessage);
     }
   };
 
@@ -29,7 +41,10 @@ const ForgotPassword = () => {
           <p className="text-sm text-slate-500 mt-2">
             If an account exists for <strong>{email}</strong>, you will receive a secure link shortly.
           </p>
-          <Link to="/login" className="inline-block mt-6 text-[#C5A059] font-bold text-xs uppercase tracking-widest hover:underline">
+          <Link
+            to="/login"
+            className="inline-block mt-6 text-[#C5A059] font-bold text-xs uppercase tracking-widest hover:underline"
+          >
             Return to Login
           </Link>
         </div>
@@ -40,16 +55,24 @@ const ForgotPassword = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border-l-4 border-[#355E3B]">
-        <Link to="/login" className="flex items-center gap-2 text-slate-400 hover:text-[#355E3B] mb-6 transition-colors">
+        <Link
+          to="/login"
+          className="flex items-center gap-2 text-slate-400 hover:text-[#355E3B] mb-6 transition-colors"
+        >
           <ArrowLeft size={16} /> <span className="text-[10px] font-black uppercase">Back</span>
         </Link>
-        
+
         <h2 className="text-xl font-serif font-bold text-slate-800">Account Recovery</h2>
-        <p className="text-xs text-slate-500 mt-1 mb-8">Enter your official email to receive a password reset link.</p>
+        <p className="text-xs text-slate-500 mt-1 mb-8">
+          Enter your official email to receive a password reset link.
+        </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <Mail
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+              size={18}
+            />
             <input
               type="email"
               required
@@ -61,7 +84,7 @@ const ForgotPassword = () => {
           </div>
           <button
             disabled={loading}
-            className="w-full bg-[#355E3B] text-white py-4 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-70"
+            className="w-full bg-[#355E3B] text-white py-4 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-70 transition-all active:scale-[0.98]"
           >
             {loading ? <Loader2 className="animate-spin" size={16} /> : "Send Reset Link"}
           </button>

@@ -3,6 +3,7 @@ import {
   createAsyncThunk,
   type PayloadAction,
 } from "@reduxjs/toolkit";
+import { AxiosError } from "axios";
 import { api } from "../../api/axios";
 
 /* =====================================
@@ -13,7 +14,6 @@ export interface IUser {
   name: string;
   pj: string;
   email: string;
-  // Added "dr" and "judge" to resolve TS comparison errors
   role: "admin" | "judge" | "dr" | "guest";
   cohort?: number;
   isActive: boolean;
@@ -32,6 +32,14 @@ interface UserState {
   error: string | null;
 }
 
+// Interface to handle the dynamic response from active conversations
+interface IActiveConversationResponse {
+  _id: string;
+}
+
+/* =====================================
+    Local Storage Helper
+===================================== */
 /* =====================================
     Local Storage Helper
 ===================================== */
@@ -40,7 +48,7 @@ const getPersistedActiveIds = (): string[] => {
     const saved = localStorage.getItem("active_chat_ids");
     if (!saved || saved === "undefined") return [];
     return JSON.parse(saved);
-  } catch (error) {
+  } catch { // Variable removed to satisfy no-unused-vars
     return [];
   }
 };
@@ -57,30 +65,36 @@ const initialState: UserState = {
     Async Thunks
 ===================================== */
 
-export const fetchProfile = createAsyncThunk(
+export const fetchProfile = createAsyncThunk<IUser, void, { rejectValue: string }>(
   "users/fetchProfile",
   async (_, thunkAPI) => {
     try {
-      const { data } = await api.get("/users/me");
+      const { data } = await api.get<{ user: IUser }>("/users/me");
       return data.user;
-    } catch (err: any) {
-      return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Failed to fetch profile",
-      );
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(
+          err.response?.data?.message || "Failed to fetch profile",
+        );
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   },
 );
 
-export const fetchUsers = createAsyncThunk(
+export const fetchUsers = createAsyncThunk<IUser[], void, { rejectValue: string }>(
   "users/fetchUsers",
   async (_, thunkAPI) => {
     try {
-      const { data } = await api.get("/users/get");
+      const { data } = await api.get<{ users: IUser[] }>("/users/get");
       return data.users;
-    } catch (err: any) {
-      return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Registry retrieval failed",
-      );
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(
+          err.response?.data?.message || "Registry retrieval failed",
+        );
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   },
 );
@@ -98,74 +112,94 @@ export const createAdminUser = createAsyncThunk<
   { rejectValue: string }
 >("users/createAdminUser", async (userData, thunkAPI) => {
   try {
-    const { data } = await api.post("/users/create", userData);
-    return data.user as IUser;
-  } catch (err: any) {
-    return thunkAPI.rejectWithValue(
-      err.response?.data?.message || "Failed to create user",
-    );
+    const { data } = await api.post<{ user: IUser }>("/users/create", userData);
+    return data.user;
+  } catch (err: unknown) {
+    if (err instanceof AxiosError) {
+      return thunkAPI.rejectWithValue(
+        err.response?.data?.message || "Failed to create user",
+      );
+    }
+    return thunkAPI.rejectWithValue("An unknown error occurred");
   }
 });
 
-export const updateAdminUser = createAsyncThunk(
+export const updateAdminUser = createAsyncThunk<
+  IUser,
+  { id: string; updates: Partial<IUser> },
+  { rejectValue: string }
+>(
   "users/updateUser",
-  async (
-    { id, updates }: { id: string; updates: Partial<IUser> },
-    thunkAPI,
-  ) => {
+  async ({ id, updates }, thunkAPI) => {
     try {
-      const { data } = await api.patch(`/users/${id}`, updates);
+      const { data } = await api.patch<{ user: IUser }>(`/users/${id}`, updates);
       return data.user;
-    } catch (err: any) {
-      return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Update failed",
-      );
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(
+          err.response?.data?.message || "Update failed",
+        );
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   },
 );
 
-export const editAdminDetails = createAsyncThunk(
+export const editAdminDetails = createAsyncThunk<
+  IUser,
+  { id: string; updates: Partial<IUser> },
+  { rejectValue: string }
+>(
   "users/editDetails",
-  async (
-    { id, updates }: { id: string; updates: Partial<IUser> },
-    thunkAPI,
-  ) => {
+  async ({ id, updates }, thunkAPI) => {
     try {
-      const { data } = await api.patch(`/users/edit/${id}`, updates);
+      const { data } = await api.patch<{ user: IUser }>(`/users/edit/${id}`, updates);
       return data.user;
-    } catch (err: any) {
-      return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Details update failed",
-      );
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(
+          err.response?.data?.message || "Details update failed",
+        );
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   },
 );
 
-export const deleteAdminUser = createAsyncThunk(
+export const deleteAdminUser = createAsyncThunk<string, string, { rejectValue: string }>(
   "users/deleteUser",
-  async (id: string, thunkAPI) => {
+  async (id, thunkAPI) => {
     try {
       await api.delete(`/users/${id}`);
       return id;
-    } catch (err: any) {
-      return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Deletion failed",
-      );
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(
+          err.response?.data?.message || "Deletion failed",
+        );
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   },
 );
 
-export const fetchActiveConversations = createAsyncThunk(
+export const fetchActiveConversations = createAsyncThunk<string[], void, { rejectValue: string }>(
   "users/fetchActiveConversations",
   async (_, thunkAPI) => {
     try {
-      const { data } = await api.get("/chat/conversations/active");
-      // Map the array to ensure we are getting IDs correctly
-      return Array.isArray(data) ? data.map((c) => c._id || c) : [];
-    } catch (err: any) {
-      return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Failed to fetch conversations",
-      );
+      // Handles data that could be a string array or object array
+      const { data } = await api.get<(IActiveConversationResponse | string)[]>("/chat/conversations/active");
+      
+      return Array.isArray(data) 
+        ? data.map((c) => (typeof c === "string" ? c : c._id)) 
+        : [];
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(
+          err.response?.data?.message || "Failed to fetch conversations",
+        );
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   },
 );
@@ -200,28 +234,28 @@ const userSlice = createSlice({
     builder
       .addCase(
         fetchProfile.fulfilled,
-        (state, action: PayloadAction<IUser>) => {
+        (state, action) => {
           state.loading = false;
           state.profile = action.payload;
         },
       )
       .addCase(
         fetchUsers.fulfilled,
-        (state, action: PayloadAction<IUser[]>) => {
+        (state, action) => {
           state.loading = false;
           state.users = action.payload;
         },
       )
       .addCase(
         createAdminUser.fulfilled,
-        (state, action: PayloadAction<IUser>) => {
+        (state, action) => {
           state.loading = false;
           state.users.unshift(action.payload);
         },
       )
       .addCase(
         deleteAdminUser.fulfilled,
-        (state, action: PayloadAction<string>) => {
+        (state, action) => {
           state.users = state.users.filter((u) => u._id !== action.payload);
           state.activeConversationIds = state.activeConversationIds.filter(
             (id) => id !== action.payload,
@@ -234,7 +268,7 @@ const userSlice = createSlice({
       )
       .addCase(
         fetchActiveConversations.fulfilled,
-        (state, action: PayloadAction<string[]>) => {
+        (state, action) => {
           state.activeConversationIds = action.payload;
           localStorage.setItem(
             "active_chat_ids",
@@ -242,7 +276,6 @@ const userSlice = createSlice({
           );
         },
       )
-      // Use Matchers for Pending/Rejected to keep it clean
       .addMatcher(
         (action) => action.type.endsWith("/pending"),
         (state) => {
@@ -255,7 +288,6 @@ const userSlice = createSlice({
           action.type.endsWith("/rejected"),
         (state, action) => {
           state.loading = false;
-          // Now TypeScript knows action.payload exists and is a string
           state.error = action.payload || "An unexpected error occurred";
         },
       )

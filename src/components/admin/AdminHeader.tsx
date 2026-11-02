@@ -1,14 +1,19 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  User, Bell, BellOff, Search, Calendar, ChevronRight, Loader2, LogOut, Settings
+  User,
+  Bell,
+  BellOff,
+  Search,
+  Calendar,
+  ChevronRight,
+  Loader2,
+  LogOut,
+  Settings,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { subscribeUserToPush } from "../../store/slices/pushSlice";
-/* ============================================================
-    FIX 1: Point to the correct Slice (authSlice)
-   ============================================================ */
 import { clearUnreadCount } from "../../store/slices/adminMessageSlice";
 import { logoutUser } from "../../store/slices/adminAuthSlice";
 
@@ -46,23 +51,26 @@ const AdminHeader: React.FC = () => {
     }
   };
 
-  /* ============================================================
-      FIX 2: Provide the required boolean argument to logoutUser
-     ============================================================ */
   const handleLogout = async () => {
     setIsProfileOpen(false);
     const toastId = toast.loading("Terminating session...", {
-      style: { background: '#355E3B', color: '#fff', fontSize: '10px', fontWeight: 'bold' }
+      style: {
+        background: "#355E3B",
+        color: "#fff",
+        fontSize: "10px",
+        fontWeight: "bold",
+      },
     });
 
     try {
       // Pass 'false' (allDevices) to satisfy the thunk's argument requirement
       await dispatch(logoutUser(false)).unwrap();
-      
+
       toast.success("Session Terminated", { id: toastId });
       navigate("/login", { replace: true });
-    } catch (error) {
-      // Matcher in authSlice ensures local state is wiped even if the request fails
+    } catch {
+      // Using 'catch' without a variable to satisfy eslint@typescript-eslint/no-unused-vars
+      // Local state is still wiped via the authSlice matcher even if the server request fails
       toast.success("Logged out (Session Cleared)", { id: toastId });
       navigate("/login", { replace: true });
     }
@@ -75,7 +83,10 @@ const AdminHeader: React.FC = () => {
   };
 
   const today = new Date().toLocaleDateString("en-GB", {
-    weekday: "long", day: "numeric", month: "long", year: "numeric",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 
   return (
@@ -95,7 +106,9 @@ const AdminHeader: React.FC = () => {
         {/* Date Display */}
         <div className="hidden lg:flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg border border-slate-100">
           <Calendar size={14} className="text-[#355E3B]" />
-          <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">{today}</span>
+          <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">
+            {today}
+          </span>
         </div>
 
         {/* Actions Group */}
@@ -108,7 +121,9 @@ const AdminHeader: React.FC = () => {
             <button
               onClick={handleBellClick}
               className={`p-2 rounded-full transition-all relative ${
-                permission === "granted" ? "text-slate-400 hover:text-[#355E3B] hover:bg-emerald-50" : "text-red-300 hover:bg-red-50"
+                permission === "granted"
+                  ? "text-slate-400 hover:text-[#355E3B] hover:bg-emerald-50"
+                  : "text-red-300 hover:bg-red-50"
               }`}
             >
               {pushLoading ? (
@@ -127,7 +142,9 @@ const AdminHeader: React.FC = () => {
             {isNotifOpen && (
               <div className="absolute right-[-60px] md:right-0 mt-4 w-72 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
                 <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                  <span className="text-[10px] font-black uppercase tracking-tighter text-slate-500">Alerts</span>
+                  <span className="text-[10px] font-black uppercase tracking-tighter text-slate-500">
+                    Alerts
+                  </span>
                   <span className="bg-[#355E3B] text-white text-[9px] px-2 py-0.5 rounded-full">
                     {unreadCount} New
                   </span>
@@ -135,10 +152,12 @@ const AdminHeader: React.FC = () => {
                 <div className="max-h-60 overflow-y-auto p-4 text-center">
                   {unreadCount > 0 ? (
                     <p className="text-[11px] text-slate-600 font-medium">
-                      You have {unreadCount} unread message{unreadCount > 1 ? 's' : ''}.
+                      You have {unreadCount} unread message{unreadCount > 1 ? "s" : ""}.
                     </p>
                   ) : (
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Clear for now</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                      Clear for now
+                    </p>
                   )}
                 </div>
               </div>
@@ -148,7 +167,10 @@ const AdminHeader: React.FC = () => {
 
         {/* User Profile Section */}
         <div className="relative" ref={profileRef}>
-          <div onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-2 md:gap-3 pl-1 cursor-pointer group">
+          <div
+            onClick={() => setIsProfileOpen(!isProfileOpen)}
+            className="flex items-center gap-2 md:gap-3 pl-1 cursor-pointer group"
+          >
             <div className="text-right hidden sm:block max-w-[150px] md:max-w-[200px]">
               <p className="text-xs font-black text-slate-800 uppercase tracking-wide group-hover:text-[#355E3B] transition-colors truncate">
                 {user?.name || "Administrator"}
@@ -165,7 +187,9 @@ const AdminHeader: React.FC = () => {
           {isProfileOpen && (
             <div className="absolute right-0 mt-4 w-52 md:w-56 bg-white border border-slate-200 rounded-xl shadow-2xl p-1 animate-in fade-in slide-in-from-top-2">
               <div className="px-4 py-3 border-b border-slate-50">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Account</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Account
+                </p>
                 <p className="text-xs font-bold text-slate-700 truncate">{user?.email}</p>
               </div>
               <button className="w-full flex items-center gap-3 px-3 py-2.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 rounded-lg transition-colors mt-1">

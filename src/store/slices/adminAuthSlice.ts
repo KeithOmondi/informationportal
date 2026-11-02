@@ -2,10 +2,9 @@ import {
   createSlice,
   createAsyncThunk,
   type ActionReducerMapBuilder,
-  type PayloadAction,
 } from "@reduxjs/toolkit";
 import { api } from "../../api/axios";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 
 /* ===========================
     TYPES
@@ -59,73 +58,73 @@ const initialState: AuthState = {
     ASYNC THUNKS
 =========================== */
 
-export const loginUser = createAsyncThunk(
+export const loginUser = createAsyncThunk<AuthResponse, { pj?: string; email?: string; password?: string }, { rejectValue: string }>(
   "auth/loginUser",
-  async (
-    credentials: { pj?: string; email?: string; password?: string },
-    { rejectWithValue }
-  ) => {
+  async (credentials, { rejectWithValue }) => {
     try {
       const res = await api.post("/auth/login", credentials, {
         withCredentials: true,
       });
-      return res.data as AuthResponse;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Login failed.");
+      return res.data;
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        return rejectWithValue(err.response?.data?.message || "Login failed.");
+      }
+      return rejectWithValue("An unknown error occurred.");
     }
   }
 );
 
-export const requestPasswordReset = createAsyncThunk(
+export const requestPasswordReset = createAsyncThunk<{ message: string }, string, { rejectValue: string }>(
   "auth/requestPasswordReset",
-  async (email: string, { rejectWithValue }) => {
+  async (email, { rejectWithValue }) => {
     try {
       const res = await api.post("/auth/forgot-password", { email });
       return res.data;
-    } catch (err: any) {
-      return rejectWithValue(
-        err.response?.data?.message || "Failed to send reset link."
-      );
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        return rejectWithValue(err.response?.data?.message || "Failed to send reset link.");
+      }
+      return rejectWithValue("An unknown error occurred.");
     }
   }
 );
 
-export const finalizePasswordReset = createAsyncThunk(
+export const finalizePasswordReset = createAsyncThunk<{ message: string }, { token: string; password: string }, { rejectValue: string }>(
   "auth/finalizePasswordReset",
-  async ({ token, password }: any, { rejectWithValue }) => {
+  async ({ token, password }, { rejectWithValue }) => {
     try {
       const res = await api.patch(`/auth/reset-password/${token}`, {
         password,
       });
       return res.data;
-    } catch (err: any) {
-      return rejectWithValue(
-        err.response?.data?.message || "Reset link invalid or expired."
-      );
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        return rejectWithValue(err.response?.data?.message || "Reset link invalid or expired.");
+      }
+      return rejectWithValue("An unknown error occurred.");
     }
   }
 );
 
-export const setupPassword = createAsyncThunk(
+export const setupPassword = createAsyncThunk<AuthResponse, { userId: string; newPassword: string }, { rejectValue: string }>(
   "auth/setupPassword",
-  async (
-    data: { userId: string; newPassword: string },
-    { rejectWithValue }
-  ) => {
+  async (data, { rejectWithValue }) => {
     try {
       const res = await api.patch("/auth/setup-password", data, {
         withCredentials: true,
       });
-      return res.data as AuthResponse;
-    } catch (err: any) {
-      return rejectWithValue(
-        err.response?.data?.message || "Failed to set password."
-      );
+      return res.data;
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        return rejectWithValue(err.response?.data?.message || "Failed to set password.");
+      }
+      return rejectWithValue("An unknown error occurred.");
     }
   }
 );
 
-export const refreshUser = createAsyncThunk(
+export const refreshUser = createAsyncThunk<AuthResponse, void, { rejectValue: string }>(
   "auth/refreshUser",
   async (_, { rejectWithValue }) => {
     try {
@@ -134,21 +133,24 @@ export const refreshUser = createAsyncThunk(
         {},
         { withCredentials: true }
       );
-      return res.data as AuthResponse;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "NO_SESSION");
+      return res.data;
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        return rejectWithValue(err.response?.data?.message || "NO_SESSION");
+      }
+      return rejectWithValue("An unknown error occurred.");
     }
   }
 );
 
-export const logoutUser = createAsyncThunk(
+export const logoutUser = createAsyncThunk<boolean, boolean | undefined, { rejectValue: string }>(
   "auth/logoutUser",
-  async (allDevices: boolean = false, { rejectWithValue }) => {
+  async (allDevices = false, { rejectWithValue }) => {
     try {
       const endpoint = allDevices ? "/auth/logout-all" : "/auth/logout";
       await api.post(endpoint, {}, { withCredentials: true });
       return true;
-    } catch (err: any) {
+    } catch {
       return rejectWithValue("Local session cleared.");
     }
   }
@@ -187,7 +189,7 @@ const authSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(loginUser.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
+      .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
         if (action.payload.requiresPasswordChange) {
           state.requiresPasswordChange = true;
@@ -200,7 +202,7 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload ?? "Login failed.";
         state.isInitialized = true;
       })
 
@@ -215,7 +217,7 @@ const authSlice = createSlice({
       })
       .addCase(requestPasswordReset.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload ?? "Failed to send reset link.";
       })
 
       /* ---------- RESET PASSWORD ---------- */
@@ -229,11 +231,11 @@ const authSlice = createSlice({
       })
       .addCase(finalizePasswordReset.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload ?? "Reset link invalid or expired.";
       })
 
       /* ---------- SETUP PASSWORD ---------- */
-      .addCase(setupPassword.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
+      .addCase(setupPassword.fulfilled, (state, action) => {
         state.user = action.payload.user;
         state.accessToken = action.payload.accessToken;
         state.requiresPasswordChange = false;
@@ -241,24 +243,23 @@ const authSlice = createSlice({
       })
 
       /* ---------- REFRESH ---------- */
-      // ✅ NEW: pending case blocks routes from rendering prematurely
       .addCase(refreshUser.pending, (state) => {
         state.loading = true;
         state.isInitialized = false;
       })
-      .addCase(refreshUser.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
+      .addCase(refreshUser.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload.user;
         state.accessToken = action.payload.accessToken;
-        state.isInitialized = true; // ✅ gate opens only after full user+role is set
+        state.isInitialized = true;
       })
       .addCase(refreshUser.rejected, (state, action) => {
         state.loading = false;
         state.user = null;
         state.accessToken = null;
-        state.isInitialized = true; // ✅ no session confirmed — open gate to /login
-        const msg = action.payload as string;
-        if (msg !== "NO_SESSION") state.error = msg;
+        state.isInitialized = true;
+        const msg = action.payload;
+        if (msg !== "NO_SESSION") state.error = msg ?? null;
       })
 
       /* ---------- LOGOUT ---------- */

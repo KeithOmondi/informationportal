@@ -8,6 +8,7 @@ import {
   LogOut, 
   Image as ImageIcon, 
   Scale,
+  Zap,
   type LucideIcon 
 } from "lucide-react";
 import { useAppDispatch } from "../../store/hooks";
@@ -64,7 +65,7 @@ const JudgeSidebar = ({ isOpen, setIsOpen }: JudgeSidebarProps) => {
       await dispatch(logoutUser(false)).unwrap();
       setIsOpen(false);
       navigate("/login");
-    } catch (error) {
+    } catch {
       // The slice's .addMatcher clears state locally even on server error
       setIsOpen(false);
       navigate("/login");
@@ -97,7 +98,7 @@ const JudgeSidebar = ({ isOpen, setIsOpen }: JudgeSidebarProps) => {
               <Scale size={16} className="text-[#355E3B]" />
             </div>
             <span className="font-black text-[10px] text-[#355E3B] uppercase tracking-[0.15em]">
-              Registry Navigation
+              Navigation Links
             </span>
           </div>
         </div>
@@ -129,6 +130,7 @@ const JudgeSidebar = ({ isOpen, setIsOpen }: JudgeSidebarProps) => {
             <NavItem icon={BellRing} label="Notice Board" to="/judge/notices" onClick={() => setIsOpen(false)} />
             <NavItem icon={Calendar} label="Events" to="/judge/events" onClick={() => setIsOpen(false)} />
             <NavItem icon={ImageIcon} label="Gallery" to="/judge/gallery" onClick={() => setIsOpen(false)} />
+            <NavItem icon={Zap} label="My Utilities" to="/judge/utilities" onClick={() => setIsOpen(false)} />
           </nav>
         </div>
 
@@ -145,7 +147,7 @@ const JudgeSidebar = ({ isOpen, setIsOpen }: JudgeSidebarProps) => {
           <div className="mt-4 flex flex-col items-center gap-1 opacity-40">
             <div className="h-px w-8 bg-slate-300" />
             <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
-              Secure Registry Access
+              Secure Access
             </p>
           </div>
         </div>

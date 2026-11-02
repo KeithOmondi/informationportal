@@ -54,8 +54,20 @@ const DrPasswordSetup = () => {
       // 2. Clear the temporary session and force a fresh login
       await dispatch(logoutUser(false)).unwrap();
       navigate("/login", { replace: true });
-    } catch (err: any) {
-      toast.error(err || "Failed to set password", { id: toastId });
+    } catch (err) {
+      // Logic to handle 'unknown' error type safely
+      let errorMessage = "Failed to set password";
+      
+      if (typeof err === "string") {
+        errorMessage = err;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (err && typeof err === "object" && "message" in err) {
+        // Handle standard Redux rejectWithValue objects
+        errorMessage = String((err as { message: unknown }).message);
+      }
+
+      toast.error(errorMessage, { id: toastId });
     }
   };
 
@@ -80,7 +92,7 @@ const DrPasswordSetup = () => {
               Action Required
             </span>
           </div>
-          <h1 className="text-2xl font-serif font-bold text-[#355E3B] leading-tight">
+          <h1 className="text-2xl font-serif font-bold text-[#355E3B] leading-tight text-center">
             PASSWORD RESET
           </h1>
         </div>
@@ -175,7 +187,7 @@ const DrPasswordSetup = () => {
 
         {/* Footer */}
         <p className="mt-8 text-center text-[9px] font-bold text-slate-400 uppercase tracking-[0.3em]">
-          Office of thr Registrar High Court &copy; 2026
+          Office of the Registrar High Court &copy; 2026
         </p>
       </div>
     </div>

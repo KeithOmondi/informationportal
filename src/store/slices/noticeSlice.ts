@@ -1,9 +1,9 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import { AxiosError } from "axios";
 import { api } from "../../api/axios";
 
 /* ================= TYPES ================= */
 export type NoticePriority = "NORMAL" | "URGENT";
-// Updated to match your Backend Model
 export type TargetAudience = "ALL" | "JUDGES" | "DR";
 
 export interface IAttachment {
@@ -37,7 +37,7 @@ export interface INotice {
     views: number;
     downloads: number;
   };
-  readBy?: string[]; // Array of User IDs who have read this
+  readBy?: string[];
   createdBy?: {
     _id: string;
     name: string;
@@ -48,10 +48,10 @@ export interface INotice {
 
 interface NoticeState {
   notices: INotice[];
-  publicNotices: INotice[]; // Specifically for items with audience "ALL"
+  publicNotices: INotice[];
   notice?: INotice;
   loading: boolean;
-  uploading: boolean; 
+  uploading: boolean;
   error?: string;
 }
 
@@ -64,97 +64,117 @@ const initialState: NoticeState = {
 
 /* ================= THUNKS ================= */
 
-export const fetchPublicNotices = createAsyncThunk(
+export const fetchPublicNotices = createAsyncThunk<INotice[], { priority?: string; search?: string } | undefined, { rejectValue: string }>(
   "notices/fetchPublic",
-  async (params: { priority?: string; search?: string } | undefined, thunkAPI) => {
+  async (params, thunkAPI) => {
     try {
-      const { data } = await api.get(`/notices/public`, { params });
+      const { data } = await api.get<INotice[]>(`/notices/public`, { params });
       return data;
-    } catch (err: any) {
-      return thunkAPI.rejectWithValue(err.response?.data?.message || "Failed to fetch public notices");
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(err.response?.data?.message || "Failed to fetch public notices");
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   }
 );
 
-export const fetchNotices = createAsyncThunk(
+export const fetchNotices = createAsyncThunk<INotice[], { priority?: string; search?: string } | undefined, { rejectValue: string }>(
   "notices/fetchAll",
-  async (params: { priority?: string; search?: string } | undefined, thunkAPI) => {
+  async (params, thunkAPI) => {
     try {
-      // Backend now filters this automatically based on req.user.role
-      const { data } = await api.get(`/notices`, {
+      const { data } = await api.get<INotice[]>(`/notices`, {
         params,
         withCredentials: true,
       });
       return data;
-    } catch (err: any) {
-      return thunkAPI.rejectWithValue(err.response?.data?.message || "Failed to fetch notices");
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(err.response?.data?.message || "Failed to fetch notices");
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   }
 );
 
-export const createNotice = createAsyncThunk(
+export const createNotice = createAsyncThunk<INotice, FormData, { rejectValue: string }>(
   "notices/create",
-  async (formData: FormData, thunkAPI) => {
+  async (formData, thunkAPI) => {
     try {
-      const { data } = await api.post(`/notices/create`, formData, {
+      const { data } = await api.post<INotice>(`/notices/create`, formData, {
         withCredentials: true,
         headers: { "Content-Type": "multipart/form-data" },
       });
       return data;
-    } catch (err: any) {
-      return thunkAPI.rejectWithValue(err.response?.data?.message || "Upload failed");
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(err.response?.data?.message || "Upload failed");
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   }
 );
 
-export const fetchNoticeById = createAsyncThunk(
+export const fetchNoticeById = createAsyncThunk<INotice, string, { rejectValue: string }>(
   "notices/fetchOne",
-  async (id: string, thunkAPI) => {
+  async (id, thunkAPI) => {
     try {
-      const { data } = await api.get(`/notices/${id}`, { withCredentials: true });
+      const { data } = await api.get<INotice>(`/notices/${id}`, { withCredentials: true });
       return data;
-    } catch (err: any) {
-      return thunkAPI.rejectWithValue(err.response?.data?.message || "Fetch failed");
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(err.response?.data?.message || "Fetch failed");
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   }
 );
 
-export const updateNotice = createAsyncThunk(
+export const updateNotice = createAsyncThunk<INotice, { id: string; formData: FormData }, { rejectValue: string }>(
   "notices/update",
-  async ({ id, formData }: { id: string; formData: FormData }, thunkAPI) => {
+  async ({ id, formData }, thunkAPI) => {
     try {
-      const { data } = await api.put(`/notices/update/${id}`, formData, {
+      const { data } = await api.put<INotice>(`/notices/update/${id}`, formData, {
         withCredentials: true,
         headers: { "Content-Type": "multipart/form-data" },
       });
       return data;
-    } catch (err: any) {
-      return thunkAPI.rejectWithValue(err.response?.data?.message || "Update failed");
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(err.response?.data?.message || "Update failed");
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   }
 );
 
-export const deleteNotice = createAsyncThunk(
+export const deleteNotice = createAsyncThunk<string, string, { rejectValue: string }>(
   "notices/delete",
-  async (id: string, thunkAPI) => {
+  async (id, thunkAPI) => {
     try {
       await api.delete(`/notices/delete/${id}`, { withCredentials: true });
       return id;
-    } catch (err: any) {
-      return thunkAPI.rejectWithValue(err.response?.data?.message || "Delete failed");
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(err.response?.data?.message || "Delete failed");
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   }
 );
 
-export const downloadNotice = createAsyncThunk(
+export const downloadNotice = createAsyncThunk<string, string, { rejectValue: string }>(
   "notices/download",
-  async (id: string, thunkAPI) => {
+  async (id, thunkAPI) => {
     try {
-      const { data } = await api.get(`/notices/download/${id}`, { withCredentials: true });
+      const { data } = await api.get<{ url: string }>(`/notices/download/${id}`, { withCredentials: true });
       if (data.url) window.open(data.url, "_blank");
       return id;
-    } catch (err: any) {
-      return thunkAPI.rejectWithValue(err.response?.data?.message || "Download failed");
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(err.response?.data?.message || "Download failed");
+      }
+      return thunkAPI.rejectWithValue("An unknown error occurred");
     }
   }
 );
@@ -172,12 +192,17 @@ const noticeSlice = createSlice({
   extraReducers: (builder) => {
     builder
       /* FETCH LOGIC */
-      .addCase(fetchPublicNotices.fulfilled, (state, action: PayloadAction<INotice[]>) => {
+      .addCase(fetchPublicNotices.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchPublicNotices.fulfilled, (state, action) => {
         state.loading = false;
         state.publicNotices = action.payload;
       })
-      .addCase(fetchNotices.pending, (state) => { state.loading = true; })
-      .addCase(fetchNotices.fulfilled, (state, action: PayloadAction<INotice[]>) => {
+      .addCase(fetchNotices.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchNotices.fulfilled, (state, action) => {
         state.loading = false;
         state.notices = action.payload;
       })
@@ -187,7 +212,7 @@ const noticeSlice = createSlice({
         state.uploading = true;
         state.error = undefined;
       })
-      .addCase(createNotice.fulfilled, (state, action: PayloadAction<INotice>) => {
+      .addCase(createNotice.fulfilled, (state, action) => {
         state.uploading = false;
         state.notices.unshift(action.payload);
         if (action.payload.targetAudience === "ALL") {
@@ -196,28 +221,28 @@ const noticeSlice = createSlice({
       })
       .addCase(createNotice.rejected, (state, action) => {
         state.uploading = false;
-        state.error = action.payload as string;
+        state.error = action.payload;
       })
 
-      /* SINGLE VIEW & AUDIT SYNC */
-      .addCase(fetchNoticeById.fulfilled, (state, action: PayloadAction<INotice>) => {
+      /* SINGLE VIEW */
+      .addCase(fetchNoticeById.fulfilled, (state, action) => {
         state.notice = action.payload;
-        // Update statistics and read status in the main list
         const index = state.notices.findIndex((n) => n._id === action.payload._id);
         if (index !== -1) state.notices[index] = action.payload;
       })
 
       /* UPDATE */
-      .addCase(updateNotice.pending, (state) => { state.uploading = true; })
-      .addCase(updateNotice.fulfilled, (state, action: PayloadAction<INotice>) => {
+      .addCase(updateNotice.pending, (state) => {
+        state.uploading = true;
+      })
+      .addCase(updateNotice.fulfilled, (state, action) => {
         state.uploading = false;
-        state.notices = state.notices.map((n) => n._id === action.payload._id ? action.payload : n);
-        
-        // Remove from publicNotices if the update changed audience from ALL to something else
+        state.notices = state.notices.map((n) => (n._id === action.payload._id ? action.payload : n));
+
         if (action.payload.targetAudience !== "ALL") {
           state.publicNotices = state.publicNotices.filter((n) => n._id !== action.payload._id);
         } else {
-          state.publicNotices = state.publicNotices.map((n) => n._id === action.payload._id ? action.payload : n);
+          state.publicNotices = state.publicNotices.map((n) => (n._id === action.payload._id ? action.payload : n));
         }
 
         if (state.notice?._id === action.payload._id) {
@@ -226,16 +251,28 @@ const noticeSlice = createSlice({
       })
 
       /* DELETE */
-      .addCase(deleteNotice.fulfilled, (state, action: PayloadAction<string>) => {
+      .addCase(deleteNotice.fulfilled, (state, action) => {
         state.notices = state.notices.filter((n) => n._id !== action.payload);
         state.publicNotices = state.publicNotices.filter((n) => n._id !== action.payload);
       })
 
       /* STATS TRACKING */
-      .addCase(downloadNotice.fulfilled, (state, action: PayloadAction<string>) => {
+      .addCase(downloadNotice.fulfilled, (state, action) => {
         const notice = state.notices.find((n) => n._id === action.payload);
         if (notice) notice.stats.downloads += 1;
-      });
+      })
+      
+      /* GLOBAL REJECTED HANDLER */
+      .addMatcher(
+        (action) => action.type.endsWith("/rejected"),
+        (state, action: PayloadAction<string | undefined>) => {
+          state.loading = false;
+          // Only set error if not already handled by a specific case (like createNotice)
+          if (!state.error) {
+            state.error = action.payload || "An unexpected error occurred";
+          }
+        }
+      );
   },
 });
 

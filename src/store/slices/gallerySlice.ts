@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import { AxiosError } from "axios";
 import { api } from "../../api/axios";
 
 // -------------------- TYPES --------------------
@@ -33,67 +34,93 @@ const initialState: GalleryState = {
   error: null,
 };
 
+// Standard Backend Response Shape (adjust if your backend wraps differently)
+interface GalleryResponse {
+  success: boolean;
+  data: IGallery[];
+  message?: string;
+}
+
 // -------------------- THUNKS --------------------
 
-export const fetchGallery = createAsyncThunk(
+export const fetchGallery = createAsyncThunk<IGallery[], void, { rejectValue: string }>(
   "gallery/fetchGallery",
   async (_, { rejectWithValue }) => {
     try {
-      const res = await api.get(`/gallery/get`);
-      return res.data.data || res.data;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to fetch gallery");
+      const res = await api.get<GalleryResponse>(`/gallery/get`);
+      // Matches your data.data || data logic
+      return res.data.data || (res.data as unknown as IGallery[]);
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return rejectWithValue(err.response?.data?.message || "Failed to fetch gallery");
+      }
+      return rejectWithValue("An unknown error occurred");
     }
   }
 );
 
-export const fetchGalleryAdmin = createAsyncThunk(
+export const fetchGalleryAdmin = createAsyncThunk<IGallery[], void, { rejectValue: string }>(
   "gallery/fetchGalleryAdmin", 
   async (_, { rejectWithValue }) => {
     try {
-      const res = await api.get(`/gallery/admin`);
-      return res.data.data || res.data;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to fetch admin gallery");
+      const res = await api.get<GalleryResponse>(`/gallery/admin`);
+      return res.data.data || (res.data as unknown as IGallery[]);
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return rejectWithValue(err.response?.data?.message || "Failed to fetch admin gallery");
+      }
+      return rejectWithValue("An unknown error occurred");
     }
   }
 );
 
-export const uploadMedia = createAsyncThunk(
+export const uploadMedia = createAsyncThunk<IGallery[], FormData, { rejectValue: string }>(
   "gallery/uploadMedia",
-  async (formData: FormData, { rejectWithValue }) => {
+  async (formData, { rejectWithValue }) => {
     try {
-      const res = await api.post(`/gallery/upload`, formData, {
+      const res = await api.post<GalleryResponse>(`/gallery/upload`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       return res.data.data; 
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to upload media");
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return rejectWithValue(err.response?.data?.message || "Failed to upload media");
+      }
+      return rejectWithValue("An unknown error occurred");
     }
   }
 );
 
-// --- NEW: Bulk Update Thunk ---
-export const updateAudienceBulk = createAsyncThunk(
+export const updateAudienceBulk = createAsyncThunk<
+  { ids: string[]; targetAudience: AudienceRole },
+  { ids: string[]; targetAudience: AudienceRole },
+  { rejectValue: string }
+>(
   "gallery/updateAudienceBulk",
-  async ({ ids, targetAudience }: { ids: string[]; targetAudience: AudienceRole }, { rejectWithValue }) => {
+  async ({ ids, targetAudience }, { rejectWithValue }) => {
     try {
       await api.patch(`/gallery/bulk-audience`, { ids, targetAudience });
       return { ids, targetAudience };
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to update audience");
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return rejectWithValue(err.response?.data?.message || "Failed to update audience");
+      }
+      return rejectWithValue("An unknown error occurred");
     }
   }
 );
 
-export const deleteMedia = createAsyncThunk(
+export const deleteMedia = createAsyncThunk<string, string, { rejectValue: string }>(
   "gallery/deleteMedia",
-  async (id: string, { rejectWithValue }) => {
+  async (id, { rejectWithValue }) => {
     try {
       await api.delete(`/gallery/${id}`);
       return id;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to delete media");
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        return rejectWithValue(err.response?.data?.message || "Failed to delete media");
+      }
+      return rejectWithValue("An unknown error occurred");
     }
   }
 );
@@ -126,22 +153,21 @@ const gallerySlice = createSlice({
         state.loading = true; 
         state.error = null; 
       })
-      .addCase(uploadMedia.fulfilled, (state, action: PayloadAction<IGallery[]>) => { 
+      .addCase(uploadMedia.fulfilled, (state, action) => { 
         state.loading = false; 
         state.items = [...action.payload, ...state.items]; 
       })
 
       // DELETE
-      .addCase(deleteMedia.fulfilled, (state, action: PayloadAction<string>) => {
+      .addCase(deleteMedia.fulfilled, (state, action) => {
         state.loading = false;
         state.items = state.items.filter((item) => item._id !== action.payload);
       })
 
-      // --- NEW: Handle Bulk Update Success ---
+      // BULK UPDATE
       .addCase(updateAudienceBulk.fulfilled, (state, action) => {
         state.loading = false;
         const { ids, targetAudience } = action.payload;
-        // Efficiently update only the changed items in the state
         state.items = state.items.map((item) => 
           ids.includes(item._id) 
             ? { ...item, targetAudience } 
@@ -155,7 +181,7 @@ const gallerySlice = createSlice({
           fetchGallery.pending.type, 
           fetchGalleryAdmin.pending.type,
           deleteMedia.pending.type,
-          updateAudienceBulk.pending.type // Added pending state for update
+          updateAudienceBulk.pending.type
         ].includes(action.type),
         (state) => { 
           state.loading = true; 
@@ -172,9 +198,9 @@ const gallerySlice = createSlice({
       // GLOBAL REJECTED HANDLER
       .addMatcher(
         (action) => action.type.endsWith("/rejected"),
-        (state, action: any) => {
+        (state, action: PayloadAction<string | undefined>) => {
           state.loading = false;
-          state.error = action.payload as string;
+          state.error = action.payload ?? "An unexpected error occurred";
         }
       );
   },

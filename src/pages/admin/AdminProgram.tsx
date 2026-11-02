@@ -28,8 +28,10 @@ import {
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
-// Constants
+// Types & Constants
 // ---------------------------------------------------------------------------
+
+type PartialProgram = Partial<ProgramData> & { targetAudience: AudienceRole };
 
 const AUDIENCE_OPTIONS: {
   label: string;
@@ -37,15 +39,14 @@ const AUDIENCE_OPTIONS: {
   color: string;
   bg: string;
 }[] = [
-  { label: "All",    value: "all",   color: "text-slate-600", bg: "bg-slate-100"     },
-  { label: "Judges", value: "judge", color: "text-blue-700",  bg: "bg-blue-50"       },
-  { label: "DR",     value: "dr",    color: "text-[#C5A059]", bg: "bg-[#C5A059]/10" },
+  { label: "All", value: "all", color: "text-slate-600", bg: "bg-slate-100" },
+  { label: "Judges", value: "judge", color: "text-blue-700", bg: "bg-blue-50" },
+  { label: "DR", value: "dr", color: "text-[#C5A059]", bg: "bg-[#C5A059]/10" },
 ];
 
-const EMPTY_PROGRAM: Partial<ProgramData> & { targetAudience: AudienceRole } = {
+const EMPTY_PROGRAM: PartialProgram = {
   event_title: "HIGH COURT LEADERS 2026 CONFERENCE",
-  theme:
-    "PROTECTING VULNERABLE WOMEN AND CHILDREN: STRENGTHENING JUDICIAL INTERVENTION FOR ACCESS TO JUSTICE",
+  theme: "PROTECTING VULNERABLE WOMEN AND CHILDREN: STRENGTHENING JUDICIAL INTERVENTION FOR ACCESS TO JUSTICE",
   targetAudience: "all",
   schedule: [],
   isLocked: false,
@@ -86,30 +87,22 @@ const StatusBadge = ({ isLocked }: { isLocked: boolean }) => (
 // ---------------------------------------------------------------------------
 
 interface ProgramModalProps {
-  initial: Partial<ProgramData> & { targetAudience: AudienceRole };
+  initial: PartialProgram;
   onClose: () => void;
-  onSave: (data: Partial<ProgramData> & { targetAudience: AudienceRole }) => void;
+  onSave: (data: PartialProgram) => void;
   loading: boolean;
   mode: "create" | "edit";
 }
 
-const ProgramModal = ({
-  initial,
-  onClose,
-  onSave,
-  loading,
-  mode,
-}: ProgramModalProps) => {
-  const [form, setForm] = useState(initial);
+const ProgramModal = ({ initial, onClose, onSave, loading, mode }: ProgramModalProps) => {
+  const [form, setForm] = useState<PartialProgram>(initial);
 
-  const set = (key: keyof typeof form, value: unknown) =>
+  const set = <K extends keyof PartialProgram>(key: K, value: PartialProgram[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
           <div>
             <h2 className="text-[#355E3B] font-serif text-xl font-bold">
@@ -127,10 +120,7 @@ const ProgramModal = ({
           </button>
         </div>
 
-        {/* Body */}
         <div className="p-6 space-y-5">
-
-          {/* Event title */}
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
               Event Title
@@ -143,7 +133,6 @@ const ProgramModal = ({
             />
           </div>
 
-          {/* Theme */}
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
               Theme
@@ -157,7 +146,6 @@ const ProgramModal = ({
             />
           </div>
 
-          {/* Target Audience */}
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
               Target Audience
@@ -181,7 +169,6 @@ const ProgramModal = ({
             </div>
           </div>
 
-          {/* Scheduled Release */}
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
               Scheduled Release
@@ -193,14 +180,11 @@ const ProgramModal = ({
                   ? new Date(form.scheduledRelease).toISOString().slice(0, 16)
                   : ""
               }
-              onChange={(e) =>
-                set("scheduledRelease", new Date(e.target.value).toISOString())
-              }
+              onChange={(e) => set("scheduledRelease", new Date(e.target.value).toISOString())}
               className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#355E3B]/30 focus:border-[#355E3B] transition-all"
             />
           </div>
 
-          {/* Lock toggle */}
           <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
             <div>
               <p className="text-sm font-bold text-slate-700">Lock Program</p>
@@ -224,7 +208,6 @@ const ProgramModal = ({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-100 bg-slate-50/50 sticky bottom-0">
           <button
             onClick={onClose}
@@ -275,15 +258,10 @@ const ProgramCard = ({ program, onEdit, onDelete }: ProgramCardProps) => {
     : "—";
 
   const totalActivities =
-    program.schedule?.reduce(
-      (sum, day) => sum + (day.activities?.length ?? 0),
-      0
-    ) ?? 0;
+    program.schedule?.reduce((sum, day) => sum + (day.activities?.length ?? 0), 0) ?? 0;
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all overflow-hidden group">
-
-      {/* Card header */}
       <div className="p-5 flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -300,7 +278,6 @@ const ProgramCard = ({ program, onEdit, onDelete }: ProgramCardProps) => {
           )}
         </div>
 
-        {/* Hover actions */}
         <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => onEdit(program)}
@@ -319,7 +296,6 @@ const ProgramCard = ({ program, onEdit, onDelete }: ProgramCardProps) => {
         </div>
       </div>
 
-      {/* Meta row */}
       <div className="px-5 pb-4 flex items-center gap-4 flex-wrap text-[10px] text-slate-400 font-bold uppercase tracking-wider">
         <span className="flex items-center gap-1.5">
           <Clock size={10} /> {releaseDate}
@@ -330,10 +306,8 @@ const ProgramCard = ({ program, onEdit, onDelete }: ProgramCardProps) => {
         <span className="flex items-center gap-1.5">
           <FileText size={10} /> {totalActivities} activities
         </span>
-        
       </div>
 
-      {/* Schedule accordion */}
       {(program.schedule?.length ?? 0) > 0 && (
         <>
           <button
@@ -393,85 +367,88 @@ const ProgramCard = ({ program, onEdit, onDelete }: ProgramCardProps) => {
 };
 
 // ---------------------------------------------------------------------------
-// Page
+// Page Component
 // ---------------------------------------------------------------------------
 
 const AdminProgram = () => {
   const dispatch = useAppDispatch();
-  const { program, allPrograms, loading, success, error } = useAppSelector(
-    (s) => s.program
-  );
+  const { program, allPrograms, loading, success, error } = useAppSelector((s) => s.program);
 
   const [audienceFilter, setAudienceFilter] = useState<AudienceRole>("all");
-  const [modalMode, setModalMode]           = useState<"create" | "edit" | null>(null);
-  const [editTarget, setEditTarget]         = useState<ProgramData | null>(null);
-  const [deleteConfirm, setDeleteConfirm]   = useState<string | null>(null);
+  const [modalMode, setModalMode] = useState<"create" | "edit" | null>(null);
+  const [editTarget, setEditTarget] = useState<ProgramData | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  // Fetch on mount
   useEffect(() => {
     dispatch(fetchProgramForAdmin());
     dispatch(fetchAllProgramsForAdmin());
   }, [dispatch]);
 
-  // Close modal / confirm on success
-  useEffect(() => {
-    if (success) {
-      setModalMode(null);
-      setEditTarget(null);
-      setDeleteConfirm(null);
-      dispatch(fetchAllProgramsForAdmin());
-      dispatch(resetProgramStatus());
-    }
-  }, [success, dispatch]);
-
-  // Flatten grouped programs into a single list
+  // Derived data
   const allFlat: ProgramData[] = allPrograms
-    ? (["all", "judge", "dr"] as AudienceRole[]).flatMap(
-        (key) => allPrograms.grouped[key] ?? []
-      )
+    ? (["all", "judge", "dr"] as const).flatMap((key) => allPrograms.grouped[key] ?? [])
     : program
     ? [program]
     : [];
 
   const displayed =
-    audienceFilter === "all"
-      ? allFlat
-      : allFlat.filter((p) => p.targetAudience === audienceFilter);
+    audienceFilter === "all" ? allFlat : allFlat.filter((p) => p.targetAudience === audienceFilter);
 
-  // Counts for filter tabs
   const counts: Record<AudienceRole, number> = {
-    all:   allFlat.length,
+    all: allFlat.length,
     judge: allFlat.filter((p) => p.targetAudience === "judge").length,
-    dr:    allFlat.filter((p) => p.targetAudience === "dr").length,
+    dr: allFlat.filter((p) => p.targetAudience === "dr").length,
   };
 
-  // Handlers
-  const handleCreate = (
-    data: Partial<ProgramData> & { targetAudience: AudienceRole }
-  ) => dispatch(createProgram(data as any));
+  // ---------------------------------------------------------------------------
+  // Action Handlers (Fixed: Using unwrap for cleanup)
+  // ---------------------------------------------------------------------------
 
-  const handleUpdate = (
-    data: Partial<ProgramData> & { targetAudience: AudienceRole }
-  ) => {
+  const handleCreate = async (data: PartialProgram) => {
+    try {
+      await dispatch(createProgram(data as ProgramData)).unwrap();
+      // Only runs on success
+      setModalMode(null);
+      dispatch(fetchAllProgramsForAdmin());
+      dispatch(resetProgramStatus());
+    } catch (err) {
+      console.error("Creation failed", err);
+    }
+  };
+
+  const handleUpdate = async (data: PartialProgram) => {
     if (!editTarget) return;
-    dispatch(updateProgram({ id: editTarget._id, data }));
+    try {
+      await dispatch(updateProgram({ id: editTarget._id, data: data as ProgramData })).unwrap();
+      // Only runs on success
+      setModalMode(null);
+      setEditTarget(null);
+      dispatch(fetchAllProgramsForAdmin());
+      dispatch(resetProgramStatus());
+    } catch (err) {
+      console.error("Update failed", err);
+    }
   };
 
-  const handleDelete = (id: string) => dispatch(deleteProgram(id));
+  const handleDelete = async (id: string) => {
+    try {
+      await dispatch(deleteProgram(id)).unwrap();
+      // Only runs on success
+      setDeleteConfirm(null);
+      dispatch(fetchAllProgramsForAdmin());
+      dispatch(resetProgramStatus());
+    } catch (err) {
+      console.error("Delete failed", err);
+    }
+  };
 
   const openEdit = (p: ProgramData) => {
     setEditTarget(p);
     setModalMode("edit");
   };
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
-
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-
-      {/* PAGE HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
           <h1 className="text-[#355E3B] font-serif text-3xl font-bold">Programs</h1>
@@ -487,19 +464,16 @@ const AdminProgram = () => {
         </button>
       </div>
 
-      {/* TOASTS */}
       {error && (
         <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium">
           <AlertCircle size={16} className="shrink-0" />
           {error}
-          <button
-            onClick={() => dispatch(resetProgramStatus())}
-            className="ml-auto"
-          >
+          <button onClick={() => dispatch(resetProgramStatus())} className="ml-auto">
             <X size={14} />
           </button>
         </div>
       )}
+
       {success && (
         <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600 text-sm font-medium">
           <CheckCircle2 size={16} className="shrink-0" />
@@ -507,12 +481,11 @@ const AdminProgram = () => {
         </div>
       )}
 
-      {/* AUDIENCE FILTER TABS */}
       <div className="flex items-center gap-2 flex-wrap">
-        {([
+        {[
           { label: "All Programs", value: "all" as AudienceRole },
           ...AUDIENCE_OPTIONS.map((o) => ({ label: o.label, value: o.value })),
-        ] as { label: string; value: AudienceRole }[]).map((tab) => (
+        ].map((tab) => (
           <button
             key={tab.value}
             onClick={() => setAudienceFilter(tab.value)}
@@ -525,9 +498,7 @@ const AdminProgram = () => {
             {tab.label}
             <span
               className={`px-1.5 py-0.5 rounded text-[8px] font-black ${
-                audienceFilter === tab.value
-                  ? "bg-white/20 text-white"
-                  : "bg-slate-100 text-slate-400"
+                audienceFilter === tab.value ? "bg-white/20 text-white" : "bg-slate-100 text-slate-400"
               }`}
             >
               {counts[tab.value]}
@@ -536,7 +507,6 @@ const AdminProgram = () => {
         ))}
       </div>
 
-      {/* PROGRAM GRID */}
       {loading && !allPrograms ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {[1, 2, 3].map((i) => (
@@ -550,7 +520,6 @@ const AdminProgram = () => {
               </div>
               <div className="h-5 w-3/4 bg-slate-100 rounded" />
               <div className="h-3 w-full bg-slate-50 rounded" />
-              <div className="h-3 w-2/3 bg-slate-50 rounded" />
             </div>
           ))}
         </div>
@@ -560,11 +529,6 @@ const AdminProgram = () => {
             <FileText size={24} className="text-slate-300" />
           </div>
           <p className="text-slate-500 font-bold text-sm">No programs found</p>
-          <p className="text-slate-300 text-xs mt-1">
-            {audienceFilter !== "all"
-              ? `No programs targeting "${audienceFilter}" yet.`
-              : "Create your first program to get started."}
-          </p>
           <button
             onClick={() => setModalMode("create")}
             className="mt-5 flex items-center gap-2 px-5 py-2.5 bg-[#355E3B] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#2a4b30] transition-all"
@@ -585,15 +549,10 @@ const AdminProgram = () => {
         </div>
       )}
 
-      {/* CREATE / EDIT MODAL */}
       {modalMode && (
         <ProgramModal
           mode={modalMode}
-          initial={
-            modalMode === "edit" && editTarget
-              ? { ...editTarget }
-              : { ...EMPTY_PROGRAM }
-          }
+          initial={modalMode === "edit" && editTarget ? { ...editTarget } : { ...EMPTY_PROGRAM }}
           onClose={() => {
             setModalMode(null);
             setEditTarget(null);
@@ -603,7 +562,6 @@ const AdminProgram = () => {
         />
       )}
 
-      {/* DELETE CONFIRM */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5">
@@ -614,7 +572,7 @@ const AdminProgram = () => {
               <div>
                 <h3 className="font-bold text-slate-700 text-base">Delete Program</h3>
                 <p className="text-slate-400 text-sm mt-1">
-                  This action is permanent and cannot be undone. Are you sure?
+                  This action is permanent and cannot be undone.
                 </p>
               </div>
             </div>

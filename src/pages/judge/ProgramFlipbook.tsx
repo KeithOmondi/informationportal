@@ -28,7 +28,7 @@ const ProgramFlipbook = () => {
 
   return (
     <div className="flex justify-center items-center py-12 bg-slate-200/50 rounded-[2.5rem] overflow-hidden">
-      {/* @ts-ignore - Some versions of react-pageflip have legacy Ref types */}
+      {/* @ts-expect-error - Some versions of react-pageflip have legacy Ref types that conflict with React 18+ */}
       <HTMLFlipBook
         width={550}
         height={733}
@@ -126,9 +126,9 @@ const ProgramFlipbook = () => {
         {/* BACK COVER */}
         <Page number={program.schedule.length + 2}>
           <div className="flex flex-col items-center justify-center h-full opacity-20 grayscale">
-             <div className="w-20 h-20 rounded-full border-4 border-[#355E3B] flex items-center justify-center">
-                <span className="font-serif font-bold text-2xl text-[#355E3B]">ORHC</span>
-             </div>
+              <div className="w-20 h-20 rounded-full border-4 border-[#355E3B] flex items-center justify-center">
+                 <span className="font-serif font-bold text-2xl text-[#355E3B]">ORHC</span>
+              </div>
           </div>
         </Page>
       </HTMLFlipBook>

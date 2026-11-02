@@ -8,7 +8,6 @@ import adminChatReducer from "./slices/adminMessageSlice";
 import usersReducer from "./slices/adminUserSlice";
 import filesReducer from "./slices/filesSlice";
 import courtReducer from "./slices/courtInformationSlice";
-import guestReducer from "./slices/guestSlice";
 import noticesReducer from "./slices/noticeSlice";
 import eventsReducer from "./slices/eventSlice";
 import userChatReducer from "./slices/userChatSlice";
@@ -26,7 +25,6 @@ export const store = configureStore({
     users: usersReducer,
     files: filesReducer,
     court: courtReducer,
-    guest: guestReducer,
     notices: noticesReducer,
     events: eventsReducer,
     userChat: userChatReducer,

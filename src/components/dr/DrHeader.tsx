@@ -26,11 +26,17 @@ const DrHeader = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
     groups.reduce((acc, g) => acc + (g.unreadCount || 0), 0), 
   [groups]);
 
+  /* ============================================================
+      FIX: Required argument & ESLint Unused Var Fix
+     ============================================================ */
   const handleLogout = async () => {
     try {
+      // Pass 'false' (allDevices) to satisfy the thunk's argument requirement
       await dispatch(logoutUser(false)).unwrap();
       toast.success("Session Terminated");
-    } catch (e) {
+    } catch {
+      // Empty catch block handles the case where local state is cleared 
+      // by the slice matcher regardless of a successful server response.
       console.error("Logout failed, state cleared locally");
     }
   };

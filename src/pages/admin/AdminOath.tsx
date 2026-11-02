@@ -6,7 +6,6 @@ import {
   Settings2, CheckSquare
 } from "lucide-react";
 
-// Judge Actions
 import {
   fetchAdminDashboard,
   addJudgeBio,
@@ -15,22 +14,46 @@ import {
   resetCeremonyStatus,
 } from "../../store/slices/swearingPreferenceSlice";
 
-// Presentation Actions
 import {
   fetchPresentationsForAdmin,
   uploadPresentation,
   deletePresentation,
-  updatePresentationsBulk, // NEW
+  updatePresentationsBulk,
   resetPresentationStatus,
-  type PresentationRole
+  type PresentationRole,
+  type Presentation,
 } from "../../store/slices/presentationSlice";
 
 import type { AppDispatch, RootState } from "../../store/store";
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface Judge {
+  _id: string;
+  name: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  targetAudience?: string[];
+}
+
+interface JudgeFormState {
+  name: string;
+  title: string;
+  description: string;
+  audience: string;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 const AdminCeremony = () => {
   const dispatch = useDispatch<AppDispatch>();
 
-  // --- SELECTORS ---
+  // --- Redux State ---
   const {
     judges,
     loading: judgeLoading,
@@ -47,14 +70,12 @@ const AdminCeremony = () => {
     loading: presLoading
   } = useSelector((state: RootState) => state.presentations);
 
-  // --- NEW: BULK SELECTION STATE ---
+  // --- Local UI State ---
   const [selectedPresIds, setSelectedPresIds] = useState<string[]>([]);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
-
-  // --- JUDGE FORM STATE ---
-  const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [judgeForm, setJudgeForm] = useState({
+
+  const [judgeForm, setJudgeForm] = useState<JudgeFormState>({
     name: "",
     title: "",
     description: "",
@@ -62,71 +83,48 @@ const AdminCeremony = () => {
   });
   const [judgeFile, setJudgeFile] = useState<File | null>(null);
 
-  // --- PRESENTATION FORM STATE ---
   const [presTitle, setPresTitle] = useState("");
   const [presAudience, setPresAudience] = useState<PresentationRole>("all");
   const [presFile, setPresFile] = useState<File | null>(null);
 
-  // --- INITIAL FETCH ---
+  // --- Initial Fetch ---
   useEffect(() => {
     dispatch(fetchAdminDashboard());
     dispatch(fetchPresentationsForAdmin());
   }, [dispatch]);
 
-  // --- STATUS CLEANUP ---
-  useEffect(() => {
-    if (judgeSuccess || judgeError || presSuccess || presError) {
-      const timer = setTimeout(() => {
-        dispatch(resetCeremonyStatus());
-        dispatch(resetPresentationStatus());
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [judgeSuccess, judgeError, presSuccess, presError, dispatch]);
+  // ---------------------------------------------------------------------------
+  // Action Handlers (Fixed: Event-Driven via .unwrap())
+  // ---------------------------------------------------------------------------
 
-  // --- BULK HANDLERS ---
-  const togglePresSelection = (id: string) => {
-    setSelectedPresIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
-
-  const handleBulkAudienceUpdate = async (role: PresentationRole) => {
-    if (selectedPresIds.length === 0) return;
-    setIsBulkUpdating(true);
-    // Backend expects an array for targetAudience
-    await dispatch(updatePresentationsBulk({ 
-      ids: selectedPresIds, 
-      targetAudience: [role] 
-    }));
-    setIsBulkUpdating(false);
-    setSelectedPresIds([]);
-  };
-
-  // --- JUDGE HANDLERS ---
-  const handleJudgeSubmit = (e: React.FormEvent) => {
+  const handleJudgeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData();
     formData.append("name", judgeForm.name);
     formData.append("title", judgeForm.title);
     formData.append("description", judgeForm.description);
     formData.append("targetAudience", JSON.stringify([judgeForm.audience]));
-    
     if (judgeFile) formData.append("image", judgeFile);
-    if (isEditing && editingId) {
-      dispatch(updateJudgeBio({ judgeId: editingId, formData }));
-      setIsEditing(false);
+
+    try {
+      if (editingId) {
+        await dispatch(updateJudgeBio({ judgeId: editingId, formData })).unwrap();
+      } else {
+        if (!judgeFile) return alert("Please select an image");
+        await dispatch(addJudgeBio(formData)).unwrap();
+      }
+      
+      // Cleanup on Success
+      setJudgeForm({ name: "", title: "", description: "", audience: "judge" });
+      setJudgeFile(null);
       setEditingId(null);
-    } else {
-      if (!judgeFile) return alert("Please select an image");
-      dispatch(addJudgeBio(formData));
+      setTimeout(() => dispatch(resetCeremonyStatus()), 3000);
+    } catch (err) {
+      console.error("Judge operation failed", err);
     }
-    setJudgeForm({ name: "", title: "", description: "", audience: "judge" });
-    setJudgeFile(null);
   };
 
-  const handleEditJudge = (judge: any) => {
-    setIsEditing(true);
+  const handleEditJudge = (judge: Judge) => {
     setEditingId(judge._id);
     setJudgeForm({
       name: judge.name,
@@ -136,26 +134,59 @@ const AdminCeremony = () => {
     });
   };
 
-  // --- PRESENTATION HANDLERS ---
-  const handlePresentationSubmit = (e: React.FormEvent) => {
+  const handleDeleteJudge = async (id: string) => {
+    try {
+      await dispatch(deleteCeremonyItem({ type: "judges", id })).unwrap();
+      setTimeout(() => dispatch(resetCeremonyStatus()), 3000);
+    } catch (err) {
+      console.error("Delete failed", err);
+    }
+  };
+
+  const handlePresentationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!presFile) return alert("Please select a file");
-    if (!presTitle.trim()) return alert("Please enter a title");
+    if (!presFile || !presTitle.trim()) return alert("Incomplete file data");
 
     const formData = new FormData();
     formData.append("title", presTitle.trim());
     formData.append("file", presFile);
     formData.append("targetAudience", JSON.stringify([presAudience]));
 
-    dispatch(uploadPresentation(formData)).then((res) => {
-      if (res.meta.requestStatus === "fulfilled") {
-        setPresTitle("");
-        setPresFile(null);
-        setPresAudience("all");
-        const fileInput = document.getElementById("presFileInput") as HTMLInputElement;
-        if (fileInput) fileInput.value = "";
-      }
-    });
+    try {
+      await dispatch(uploadPresentation(formData)).unwrap();
+      // Cleanup on Success
+      setPresTitle("");
+      setPresFile(null);
+      setPresAudience("all");
+      const fileInput = document.getElementById("presFileInput") as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+      setTimeout(() => dispatch(resetPresentationStatus()), 3000);
+    } catch (err) {
+      console.error("Upload failed", err);
+    }
+  };
+
+  const handleBulkAudienceUpdate = async (role: PresentationRole) => {
+    if (selectedPresIds.length === 0) return;
+    setIsBulkUpdating(true);
+    try {
+      await dispatch(updatePresentationsBulk({ 
+        ids: selectedPresIds, 
+        targetAudience: [role] 
+      })).unwrap();
+      setSelectedPresIds([]);
+      setTimeout(() => dispatch(resetPresentationStatus()), 3000);
+    } catch (err) {
+      console.error("Bulk update failed", err);
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
+  const togglePresSelection = (id: string) => {
+    setSelectedPresIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
   };
 
   const formatDate = (iso: string) => {
@@ -168,7 +199,7 @@ const AdminCeremony = () => {
   return (
     <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 sm:space-y-12 pb-32 animate-in fade-in duration-700">
       
-      {/* BULK ACTION BAR (PRESENTATIONS) */}
+      {/* BULK ACTION BAR */}
       {selectedPresIds.length > 0 && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-6 border border-white/10 animate-in slide-in-from-bottom-8">
           <div className="flex items-center gap-3 border-r border-white/20 pr-6">
@@ -183,7 +214,7 @@ const AdminCeremony = () => {
                 key={role}
                 disabled={isBulkUpdating}
                 onClick={() => handleBulkAudienceUpdate(role)}
-                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-[#C5A059] transition-colors text-[9px] font-black uppercase tracking-wider"
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-[#C5A059] transition-colors text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
               >
                 Set {role}
               </button>
@@ -207,7 +238,7 @@ const AdminCeremony = () => {
         </div>
         <div className="flex flex-col items-start sm:items-end gap-2 w-full sm:w-auto">
           {(judgeSuccess || presSuccess) && (
-            <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full text-[10px] font-black uppercase border border-emerald-100 shadow-sm animate-bounce">
+            <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full text-[10px] font-black uppercase border border-emerald-100 shadow-sm">
               <CheckCircle2 size={14} /> Operation Successful
             </div>
           )}
@@ -220,18 +251,21 @@ const AdminCeremony = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12">
-        {/* LEFT: JUDICIAL BIOGRAPHIES */}
+        {/* JUDICIAL BIOGRAPHIES */}
         <section className="space-y-6">
           <div className="bg-white p-6 sm:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3 text-[#355E3B]">
                 <UserPlus size={20} />
                 <h2 className="font-bold uppercase tracking-tight text-lg">
-                  {isEditing ? "Modify Profile" : "New Biography"}
+                  {editingId ? "Modify Profile" : "New Biography"}
                 </h2>
               </div>
-              {isEditing && (
-                <button onClick={() => setIsEditing(false)} className="text-red-500 p-2 hover:bg-red-50 rounded-full">
+              {editingId && (
+                <button 
+                  onClick={() => { setEditingId(null); setJudgeForm({ name: "", title: "", description: "", audience: "judge" }); }} 
+                  className="text-red-500 p-2 hover:bg-red-50 rounded-full"
+                >
                   <X size={18} />
                 </button>
               )}
@@ -286,7 +320,7 @@ const AdminCeremony = () => {
                 disabled={judgeLoading}
                 className="w-full py-4 bg-[#355E3B] text-white rounded-2xl font-bold uppercase text-[10px] flex justify-center items-center gap-2"
               >
-                {judgeLoading ? <Loader2 className="animate-spin" size={16} /> : (isEditing ? "Update" : "Save Profile")}
+                {judgeLoading ? <Loader2 className="animate-spin" size={16} /> : (editingId ? "Update" : "Save Profile")}
               </button>
             </form>
           </div>
@@ -294,7 +328,7 @@ const AdminCeremony = () => {
           <div className="bg-[#1a1a1a] p-6 sm:p-8 rounded-[2rem] shadow-xl">
             <h3 className="text-white/40 text-[10px] font-black uppercase mb-6 tracking-widest">Registry: Judges</h3>
             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-              {judges.map((judge) => (
+              {judges.map((judge: Judge) => (
                 <div key={judge._id} className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10 group">
                   <div className="flex items-center gap-4">
                     <img src={judge.imageUrl} className="w-10 h-10 rounded-xl object-cover" alt="" />
@@ -306,7 +340,7 @@ const AdminCeremony = () => {
                   <div className="flex gap-1">
                     <button onClick={() => handleEditJudge(judge)} className="p-2 text-slate-500 hover:text-white"><Edit3 size={16} /></button>
                     <button 
-                       onClick={() => dispatch(deleteCeremonyItem({ type: "judges", id: judge._id }))}
+                       onClick={() => handleDeleteJudge(judge._id)}
                        className="p-2 text-slate-500 hover:text-red-400"
                     >
                       <Trash2 size={16} />
@@ -318,7 +352,7 @@ const AdminCeremony = () => {
           </div>
         </section>
 
-        {/* RIGHT: PRESENTATIONS */}
+        {/* PRESENTATIONS */}
         <section className="space-y-6">
           <div className="bg-white p-6 sm:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
             <h2 className="font-bold uppercase tracking-tight text-lg text-[#C5A059] mb-8">
@@ -381,7 +415,7 @@ const AdminCeremony = () => {
                  <div className="flex justify-center py-8"><Loader2 className="animate-spin text-white/20" /></div>
               ) : presentations.length === 0 ? (
                 <div className="text-white/20 text-xs italic text-center py-8">No Assets Deployed</div>
-              ) : presentations.map((p) => {
+              ) : presentations.map((p: Presentation) => {
                 const isSelected = selectedPresIds.includes(p._id);
                 return (
                   <div 
@@ -412,9 +446,10 @@ const AdminCeremony = () => {
                       </div>
                     </div>
                     <button 
-                      onClick={(e) => {
-                        e.stopPropagation(); // Prevent selection when deleting
-                        dispatch(deletePresentation(p._id));
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        await dispatch(deletePresentation(p._id)).unwrap();
+                        setTimeout(() => dispatch(resetPresentationStatus()), 3000);
                       }}
                       disabled={presDeletingId === p._id}
                       className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all shrink-0"

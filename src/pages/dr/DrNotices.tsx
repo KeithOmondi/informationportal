@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Download,
   Search,
@@ -7,7 +7,7 @@ import {
   User,
   Inbox,
   CheckCircle,
-  X, // Added for closing modal
+  X,
   Maximize2,
 } from "lucide-react";
 import debounce from "lodash/debounce";
@@ -16,26 +16,39 @@ import {
   fetchNotices,
   downloadNotice,
   type NoticePriority,
+  type INotice,
 } from "../../store/slices/noticeSlice";
+
+/* ================= TYPES ================= */
+interface FetchNoticesParams {
+  priority?: NoticePriority;
+  search?: string;
+}
+
+type FilterType = "ALL" | NoticePriority;
 
 const DrNotices = () => {
   const dispatch = useAppDispatch();
   const { notices, loading } = useAppSelector((state) => state.notices);
   const { user } = useAppSelector((state) => state.auth);
 
-  const [filter, setFilter] = useState<"ALL" | NoticePriority>("ALL");
+  const [filter, setFilter] = useState<FilterType>("ALL");
   const [search, setSearch] = useState("");
-  const [selectedNotice, setSelectedNotice] = useState<any | null>(null); // State for Modal
+  const [selectedNotice, setSelectedNotice] = useState<INotice | null>(null);
 
-  const categories: ("ALL" | NoticePriority)[] = ["ALL", "NORMAL", "URGENT"];
+  const categories: FilterType[] = ["ALL", "NORMAL", "URGENT"];
 
-  const debouncedFetch = useCallback(
-    debounce((currentFilter: string, currentSearch: string) => {
-      const params: any = {};
-      if (currentFilter !== "ALL") params.priority = currentFilter;
-      if (currentSearch) params.search = currentSearch;
-      dispatch(fetchNotices(params));
-    }, 500),
+  /**
+   * Debounced fetch logic to prevent API spamming
+   */
+  const debouncedFetch = useMemo(
+    () =>
+      debounce((currentFilter: FilterType, currentSearch: string) => {
+        const params: FetchNoticesParams = {};
+        if (currentFilter !== "ALL") params.priority = currentFilter;
+        if (currentSearch) params.search = currentSearch;
+        dispatch(fetchNotices(params));
+      }, 500),
     [dispatch]
   );
 
@@ -49,19 +62,36 @@ const DrNotices = () => {
     return `${(size / (1024 * 1024)).toFixed(2)} MB`;
   };
 
+  /**
+   * Helper to parse and render notice description with basic markdown-like support
+   */
   const renderFormattedDescription = (text: string, isModal: boolean = false) => {
     return text.split("\n").map((line, i) => {
       const trimmedLine = line.trim();
-      if (trimmedLine.startsWith("-") || trimmedLine.startsWith("*") || trimmedLine.startsWith("•")) {
+      if (!trimmedLine) return <div key={i} className="h-3" />;
+
+      const isBullet = ["-", "*", "•"].some((char) => trimmedLine.startsWith(char));
+
+      if (isBullet) {
         return (
-          <li key={i} className={`ml-5 list-disc text-slate-600 mb-1 pl-2 font-medium ${isModal ? "text-base" : "text-sm"}`}>
+          <li
+            key={i}
+            className={`ml-5 list-disc text-slate-600 mb-1 pl-2 font-medium ${
+              isModal ? "text-base" : "text-sm"
+            }`}
+          >
             {trimmedLine.substring(1).trim()}
           </li>
         );
       }
-      if (trimmedLine === "") return <div key={i} className="h-3" />;
+
       return (
-        <p key={i} className={`mb-2 text-slate-600 leading-relaxed font-medium ${isModal ? "text-base" : "text-sm"}`}>
+        <p
+          key={i}
+          className={`mb-2 text-slate-600 leading-relaxed font-medium ${
+            isModal ? "text-base" : "text-sm"
+          }`}
+        >
           {line}
         </p>
       );
@@ -70,11 +100,10 @@ const DrNotices = () => {
 
   return (
     <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 lg:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans">
-      
       {/* HEADER */}
       <div className="border-b border-slate-200 pb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="text-left">
-          <h1 className="text-[#1a3a32] font-serif text-2xl md:text-2xl font-black mb-2 tracking-tight">
+          <h1 className="text-[#1a3a32] font-serif text-2xl md:text-3xl font-black mb-2 tracking-tight">
             Notice Board
           </h1>
           <div className="flex items-center gap-2">
@@ -105,7 +134,10 @@ const DrNotices = () => {
         </div>
 
         <div className="relative flex-1">
-          <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+          <Search
+            className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300"
+            size={18}
+          />
           <input
             type="text"
             value={search}
@@ -120,12 +152,14 @@ const DrNotices = () => {
       <div className="space-y-8">
         {loading && notices.length === 0 ? (
           <div className="py-32 flex flex-col items-center justify-center space-y-4">
-             <LoaderIcon />
+            <LoaderIcon />
           </div>
         ) : notices.length === 0 ? (
           <div className="py-32 bg-slate-50 rounded-[40px] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center px-6">
             <Inbox className="text-slate-200 mb-4" size={64} />
-            <h3 className="text-slate-500 font-black uppercase tracking-widest text-xs">No Records Found</h3>
+            <h3 className="text-slate-500 font-black uppercase tracking-widest text-xs">
+              No Records Found
+            </h3>
           </div>
         ) : (
           notices.map((notice) => {
@@ -136,7 +170,9 @@ const DrNotices = () => {
               <div
                 key={notice._id}
                 className={`relative group bg-white border rounded-[32px] overflow-hidden transition-all duration-500 hover:shadow-2xl hover:shadow-[#1a3a32]/5 ${
-                  isRead ? "border-slate-100 opacity-90" : "border-[#1a3a32]/10 shadow-sm shadow-[#1a3a32]/5"
+                  isRead
+                    ? "border-slate-100 opacity-90"
+                    : "border-[#1a3a32]/10 shadow-sm shadow-[#1a3a32]/5"
                 }`}
               >
                 {!isRead && (
@@ -146,11 +182,13 @@ const DrNotices = () => {
                 <div className="p-8 lg:p-12">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-4">
-                      <span className={`text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border ${
-                        isUrgent
-                          ? "bg-red-50 text-red-600 border-red-100"
-                          : "bg-[#1a3a32]/5 text-[#1a3a32] border-[#1a3a32]/10"
-                      }`}>
+                      <span
+                        className={`text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border ${
+                          isUrgent
+                            ? "bg-red-50 text-red-600 border-red-100"
+                            : "bg-[#1a3a32]/5 text-[#1a3a32] border-[#1a3a32]/10"
+                        }`}
+                      >
                         {notice.priority}
                       </span>
                       {isUrgent && (
@@ -164,16 +202,19 @@ const DrNotices = () => {
                     </span>
                   </div>
 
-                  <h3 className={`font-serif text-2xl font-black leading-tight mb-4 ${isRead ? "text-slate-600" : "text-[#1a3a32]"}`}>
+                  <h3
+                    className={`font-serif text-2xl font-black leading-tight mb-6 ${
+                      isRead ? "text-slate-600" : "text-[#1a3a32]"
+                    }`}
+                  >
                     {notice.title}
                   </h3>
 
-                  {/* Truncated Description with View More */}
                   <div className="relative mb-6">
                     <div className="max-w-5xl line-clamp-3 overflow-hidden">
                       {renderFormattedDescription(notice.description)}
                     </div>
-                    <button 
+                    <button
                       onClick={() => setSelectedNotice(notice)}
                       className="mt-4 flex items-center gap-2 text-[#c2a336] hover:text-[#1a3a32] transition-colors text-[10px] font-black uppercase tracking-widest"
                     >
@@ -181,13 +222,16 @@ const DrNotices = () => {
                     </button>
                   </div>
 
-                  {/* FOOTER ACTION AREA */}
                   <div className="flex flex-col lg:flex-row items-center justify-between gap-8 pt-8 border-t border-slate-50">
                     <div className="flex flex-wrap items-center gap-6">
                       <div className="flex items-center gap-2">
                         <Calendar size={14} className="text-[#c2a336]" />
                         <p className="text-[10px] font-bold text-slate-500 uppercase">
-                          {new Date(notice.createdAt).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          {new Date(notice.createdAt).toLocaleDateString("en-KE", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -211,7 +255,9 @@ const DrNotices = () => {
                       ) : (
                         <div className="flex items-center gap-2 px-6 py-4 bg-slate-50 rounded-xl border border-slate-100">
                           <AlertCircle size={14} className="text-slate-300" />
-                          <span className="text-[10px] font-black text-slate-400 uppercase italic">Scan Pending</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase italic">
+                            Scan Pending
+                          </span>
                         </div>
                       )}
                     </div>
@@ -223,7 +269,7 @@ const DrNotices = () => {
         )}
       </div>
 
-      {/* FOOTER AUDIT NOTE */}
+      {/* FOOTER */}
       <div className="flex items-center justify-center gap-2 py-6 border-t border-slate-100">
         <CheckCircle size={14} className="text-[#1a3a32]" />
         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.15em]">
@@ -238,16 +284,20 @@ const DrNotices = () => {
             {/* Modal Header */}
             <div className="p-8 border-b border-slate-100 flex items-start justify-between">
               <div>
-                <span className={`text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border mb-4 inline-block ${
-                  selectedNotice.priority === "URGENT" ? "bg-red-50 text-red-600 border-red-100" : "bg-[#1a3a32]/5 text-[#1a3a32] border-[#1a3a32]/10"
-                }`}>
+                <span
+                  className={`text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border mb-4 inline-block ${
+                    selectedNotice.priority === "URGENT"
+                      ? "bg-red-50 text-red-600 border-red-100"
+                      : "bg-[#1a3a32]/5 text-[#1a3a32] border-[#1a3a32]/10"
+                  }`}
+                >
                   {selectedNotice.priority}
                 </span>
                 <h2 className="text-[#1a3a32] font-serif text-2xl font-black leading-tight">
                   {selectedNotice.title}
                 </h2>
               </div>
-              <button 
+              <button
                 onClick={() => setSelectedNotice(null)}
                 className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400"
               >
@@ -264,20 +314,21 @@ const DrNotices = () => {
 
             {/* Modal Footer */}
             <div className="p-8 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-               <div className="flex items-center gap-4">
-                  <Calendar size={14} className="text-[#c2a336]" />
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                    Posted: {new Date(selectedNotice.createdAt).toLocaleDateString('en-KE')}
-                  </p>
-               </div>
-               {selectedNotice.attachments?.length > 0 && (
-                 <button
-                    onClick={() => dispatch(downloadNotice(selectedNotice._id))}
-                    className="flex items-center gap-3 px-8 py-3 bg-[#1a3a32] text-white rounded-xl hover:bg-[#1a3a32]/90 transition-all font-bold text-[10px] uppercase tracking-widest"
-                  >
-                    <Download size={16} /> Download PDF
-                  </button>
-               )}
+              <div className="flex items-center gap-4">
+                <Calendar size={14} className="text-[#c2a336]" />
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                  Posted:{" "}
+                  {new Date(selectedNotice.createdAt).toLocaleDateString("en-KE")}
+                </p>
+              </div>
+              {selectedNotice.attachments && selectedNotice.attachments.length > 0 && (
+                <button
+                  onClick={() => dispatch(downloadNotice(selectedNotice._id))}
+                  className="flex items-center gap-3 px-8 py-3 bg-[#1a3a32] text-white rounded-xl hover:bg-[#1a3a32]/90 transition-all font-bold text-[10px] uppercase tracking-widest"
+                >
+                  <Download size={16} /> Download PDF
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -289,7 +340,9 @@ const DrNotices = () => {
 const LoaderIcon = () => (
   <div className="flex flex-col items-center gap-4">
     <div className="w-10 h-10 border-[3px] border-[#1a3a32]/10 border-t-[#1a3a32] rounded-full animate-spin" />
-    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Synchronizing data...</p>
+    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">
+      Synchronizing data...
+    </p>
   </div>
 );
 

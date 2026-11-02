@@ -4,6 +4,7 @@ import {
   type PayloadAction,
   type Action,
 } from "@reduxjs/toolkit";
+import { AxiosError } from "axios";
 import { api } from "../../api/axios";
 
 // ==========================
@@ -13,7 +14,7 @@ export interface User {
   _id: string;
   name: string;
   email: string;
-  role: "admin" | "judge" | "dr"; // Updated to include DR
+  role: "admin" | "judge" | "dr";
 }
 
 export interface Message {
@@ -23,9 +24,9 @@ export interface Message {
   group?: string;
   text?: string;
   imageUrl?: string;
-  senderType: "admin" | "judge" | "dr"; // Updated
+  senderType: "admin" | "judge" | "dr";
   isBroadcast?: boolean;
-  audience?: "JUDGES" | "DR" | "ALL"; // Matches backend scoping
+  audience?: "JUDGES" | "DR" | "ALL";
   readBy: string[];
   isEdited?: boolean;
   isDeleted?: boolean;
@@ -52,6 +53,13 @@ interface UserChatState {
   error?: string;
 }
 
+// Backend response wrapper
+interface ChatResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+}
+
 const initialState: UserChatState = {
   chatMessages: [],
   groups: [],
@@ -63,50 +71,55 @@ const initialState: UserChatState = {
 // Async Thunks
 // ==========================
 
-/**
- * Marks thread as read. 
- * Endpoint matches markThreadAsRead in controller.
- */
 export const markThreadAsRead = createAsyncThunk<
   { channelId: string },
-  { type: "broadcast" | "private" }
+  { type: "broadcast" | "private" },
+  { rejectValue: string }
 >("userChat/markThreadAsRead", async (payload, { rejectWithValue }) => {
   try {
-    // Your controller uses req.body { type }
     await api.patch("/chat/read-thread", payload);
-    // We map types to the virtual IDs used in the sidebar
-    const channelId = payload.type === "broadcast" ? "global_broadcast" : "admin_private";
+    const channelId =
+      payload.type === "broadcast" ? "global_broadcast" : "admin_private";
     return { channelId };
-  } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to mark as read");
+  } catch (err: unknown) {
+    if (err instanceof AxiosError) {
+      return rejectWithValue(err.response?.data?.message || "Failed to mark as read");
+    }
+    return rejectWithValue("An unexpected error occurred");
   }
 });
 
 export const fetchUserMessages = createAsyncThunk<
   Message[],
-  { receiver?: string; group?: string; isBroadcast?: boolean }
+  { receiver?: string; group?: string; isBroadcast?: boolean },
+  { rejectValue: string }
 >("userChat/fetchUserMessages", async (params, { rejectWithValue }) => {
   try {
-    const { data } = await api.get("/chat/messages", { params });
-    // Note: Controller returns { success: true, data: [...] }
-    return data.data; 
-  } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to fetch messages");
+    const { data } = await api.get<ChatResponse<Message[]>>("/chat/messages", { params });
+    return data.data;
+  } catch (err: unknown) {
+    if (err instanceof AxiosError) {
+      return rejectWithValue(err.response?.data?.message || "Failed to fetch messages");
+    }
+    return rejectWithValue("An unexpected error occurred");
   }
 });
 
-export const fetchUserGroups = createAsyncThunk<Group[]>(
-  "userChat/fetchUserGroups",
-  async (_, { rejectWithValue }) => {
-    try {
-      const { data } = await api.get("/chat/my-groups");
-       // Note: Controller returns { success: true, data: [...] }
-      return data.data;
-    } catch (err: any) {
+export const fetchUserGroups = createAsyncThunk<
+  Group[],
+  void,
+  { rejectValue: string }
+>("userChat/fetchUserGroups", async (_, { rejectWithValue }) => {
+  try {
+    const { data } = await api.get<ChatResponse<Group[]>>("/chat/my-groups");
+    return data.data;
+  } catch (err: unknown) {
+    if (err instanceof AxiosError) {
       return rejectWithValue(err.response?.data?.message || "Groups fetch failed");
     }
-  },
-);
+    return rejectWithValue("An unexpected error occurred");
+  }
+});
 
 // ==========================
 // Slice
@@ -122,12 +135,11 @@ const userChatSlice = createSlice({
       if (!exists) {
         state.chatMessages.push(action.payload);
 
-        // Map incoming message to the correct sidebar channel badge
-        const channelId = action.payload.isBroadcast 
-          ? "global_broadcast" 
+        const channelId = action.payload.isBroadcast
+          ? "global_broadcast"
           : "admin_private";
 
-        const group = state.groups.find(g => g._id === channelId);
+        const group = state.groups.find((g) => g._id === channelId);
         if (group) {
           group.unreadCount = (group.unreadCount || 0) + 1;
         }
@@ -147,7 +159,7 @@ const userChatSlice = createSlice({
         state.groups = action.payload;
       })
       .addCase(markThreadAsRead.fulfilled, (state, action) => {
-        const group = state.groups.find(g => g._id === action.payload.channelId);
+        const group = state.groups.find((g) => g._id === action.payload.channelId);
         if (group) {
           group.unreadCount = 0;
         }
@@ -158,20 +170,22 @@ const userChatSlice = createSlice({
         (state) => {
           state.loading = true;
           state.error = undefined;
-        },
+        }
       )
       .addMatcher(
-        (action: Action): action is PayloadAction<string> => action.type.endsWith("/rejected"),
+        (action: Action): action is PayloadAction<string> =>
+          action.type.endsWith("/rejected"),
         (state, action) => {
           state.loading = false;
-          state.error = typeof action.payload === "string" ? action.payload : "Error";
-        },
+          // Action payload is now safely typed as string via rejectValue
+          state.error = action.payload || "Error";
+        }
       )
       .addMatcher(
         (action: Action): action is Action => action.type.endsWith("/fulfilled"),
         (state) => {
           state.loading = false;
-        },
+        }
       );
   },
 });

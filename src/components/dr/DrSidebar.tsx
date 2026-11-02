@@ -24,12 +24,18 @@ const DrSidebar: React.FC<DrSidebarProps> = ({ isOpen, setIsOpen }) => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
+  /* ============================================================
+      FIX: Required argument & ESLint Unused Var Fix
+     ============================================================ */
   const handleLogout = async () => {
     try {
+      // Pass 'false' (allDevices) to satisfy the thunk's argument requirement
       await dispatch(logoutUser(false)).unwrap();
       setIsOpen(false);
       navigate("/login");
-    } catch (error) {
+    } catch {
+      // Empty catch block handles the case where local state is cleared 
+      // by the slice matcher regardless of a successful server response.
       setIsOpen(false);
       navigate("/login");
     }
@@ -127,7 +133,7 @@ const DrSidebar: React.FC<DrSidebarProps> = ({ isOpen, setIsOpen }) => {
             </NavLink>
 
 
-            <div className="px-6 mb-4">
+            <div className="px-6 mb-4 mt-6">
             <p className="text-[9px] uppercase tracking-[0.2em] text-[#C5A059] font-black flex items-center gap-2">
               <span className="h-[1px] w-3 bg-[#C5A059]/40" />
               Communications

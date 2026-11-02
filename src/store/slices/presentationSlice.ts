@@ -1,5 +1,8 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import { AxiosError } from "axios";
 import { api } from "../../api/axios";
+
+// --- Types ---
 
 export type PresentationRole = "judge" | "dr" | "admin" | "all";
 
@@ -17,6 +20,13 @@ export interface Presentation {
   downloadCount: number;
   targetAudience: PresentationRole[];
   createdAt: string;
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  count?: number;
+  message?: string;
 }
 
 interface PresentationState {
@@ -39,77 +49,85 @@ const initialState: PresentationState = {
 
 // --- Thunks ---
 
-export const fetchPresentations = createAsyncThunk(
+export const fetchPresentations = createAsyncThunk<Presentation[], void, { rejectValue: string }>(
   "presentations/fetchAll",
   async (_, thunkAPI) => {
     try {
-      const response = await api.get("/presentations");
+      // User endpoint usually returns the array directly or wrapped
+      const response = await api.get<Presentation[]>("/presentations");
       return response.data;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Failed to load presentations"
-      );
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to load presentations");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
 
-export const fetchPresentationsForAdmin = createAsyncThunk(
+export const fetchPresentationsForAdmin = createAsyncThunk<ApiResponse<Presentation[]>, void, { rejectValue: string }>(
   "presentations/fetchAdmin",
   async (_, thunkAPI) => {
     try {
-      const response = await api.get("/presentations/admin");
-      // Handle { success, count, data: [...] }
+      const response = await api.get<ApiResponse<Presentation[]>>("/presentations/admin");
       return response.data;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Failed to load presentations"
-      );
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to load presentations");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
 
-export const uploadPresentation = createAsyncThunk(
+export const uploadPresentation = createAsyncThunk<Presentation, FormData, { rejectValue: string }>(
   "presentations/upload",
-  async (formData: FormData, thunkAPI) => {
+  async (formData, thunkAPI) => {
     try {
-      const response = await api.post("/presentations/upload", formData, {
+      const response = await api.post<Presentation>("/presentations/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         timeout: 60000,
       });
       return response.data;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Upload failed. File might be too large."
-      );
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Upload failed. File might be too large.");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
 
-// --- NEW: Bulk Update Thunk ---
-export const updatePresentationsBulk = createAsyncThunk(
+export const updatePresentationsBulk = createAsyncThunk<
+  { ids: string[]; targetAudience: PresentationRole[] },
+  { ids: string[]; targetAudience: PresentationRole[] },
+  { rejectValue: string }
+>(
   "presentations/updateBulk",
-  async ({ ids, targetAudience }: { ids: string[]; targetAudience: PresentationRole[] }, thunkAPI) => {
+  async ({ ids, targetAudience }, thunkAPI) => {
     try {
       await api.patch("/presentations/bulk-update", { ids, targetAudience });
       return { ids, targetAudience };
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Bulk update failed"
-      );
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Bulk update failed");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
 
-export const deletePresentation = createAsyncThunk(
+export const deletePresentation = createAsyncThunk<string, string, { rejectValue: string }>(
   "presentations/delete",
-  async (id: string, thunkAPI) => {
+  async (id, thunkAPI) => {
     try {
       await api.delete(`/presentations/${id}`);
       return id;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Deletion failed"
-      );
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Deletion failed");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
@@ -138,7 +156,7 @@ const presentationSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchPresentations.fulfilled, (state, action: PayloadAction<Presentation[]>) => {
+      .addCase(fetchPresentations.fulfilled, (state, action) => {
         state.loading = false;
         state.items = action.payload;
       })
@@ -148,7 +166,7 @@ const presentationSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchPresentationsForAdmin.fulfilled, (state, action: PayloadAction<{ data: Presentation[] }>) => {
+      .addCase(fetchPresentationsForAdmin.fulfilled, (state, action) => {
         state.loading = false;
         state.items = action.payload.data;
       })
@@ -159,7 +177,7 @@ const presentationSlice = createSlice({
         state.success = false;
         state.error = null;
       })
-      .addCase(uploadPresentation.fulfilled, (state, action: PayloadAction<Presentation>) => {
+      .addCase(uploadPresentation.fulfilled, (state, action) => {
         state.uploading = false;
         state.success = true;
         state.items.unshift(action.payload);
@@ -170,12 +188,12 @@ const presentationSlice = createSlice({
         state.deleting = action.meta.arg;
         state.error = null;
       })
-      .addCase(deletePresentation.fulfilled, (state, action: PayloadAction<string>) => {
+      .addCase(deletePresentation.fulfilled, (state, action) => {
         state.deleting = null;
         state.items = state.items.filter((item) => item._id !== action.payload);
       })
 
-      // --- NEW: Bulk Update Handler ---
+      // Bulk Update
       .addCase(updatePresentationsBulk.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -183,7 +201,6 @@ const presentationSlice = createSlice({
       .addCase(updatePresentationsBulk.fulfilled, (state, action) => {
         state.loading = false;
         const { ids, targetAudience } = action.payload;
-        // Update local state for all matched items
         state.items = state.items.map((item) => 
           ids.includes(item._id) 
             ? { ...item, targetAudience } 
@@ -194,11 +211,11 @@ const presentationSlice = createSlice({
       // Global Rejected Matcher
       .addMatcher(
         (action) => action.type.endsWith("/rejected"),
-        (state, action: any) => {
+        (state, action: PayloadAction<string | undefined>) => {
           state.loading = false;
           state.uploading = false;
           state.deleting = null;
-          state.error = action.payload as string;
+          state.error = action.payload ?? "An unexpected error occurred";
           state.success = false;
         }
       );

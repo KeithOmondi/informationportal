@@ -15,7 +15,6 @@ import JudgeNoticesPages from "../pages/judge/JudgeNotices";
 import JudgeEventsPage from "../pages/judge/JudgeEvents";
 import CourtInformation from "../pages/judge/CourtInformation";
 import AdminCourtInfo from "../pages/admin/AdminCourtInfo";
-import AdminGuestList from "../pages/admin/AdminGuestList";
 import AdminNoticesPage from "../pages/admin/AdminNoticesPage";
 import AdminEventsPage from "../pages/admin/AdminEventsPage";
 import JudgesReligion from "../pages/judge/JudgesReligion";
@@ -24,6 +23,7 @@ import AdminUsers from "../pages/admin/AdminUsers";
 import AdminGallery from "../pages/admin/AdminGallary";
 import JudgeGallery from "../pages/judge/JudgesGallary";
 import JudgeMessagePage from "../pages/judge/JudgeMessage";
+import JudgeUtilities from "../pages/judge/JudgeUtilities";
 import DrLayout from "../components/dr/DrLayout";
 import DrDashboard from "../pages/dr/DrDashboard";
 import DrPasswordSetup from "../components/Login/DrPasswordSetup";
@@ -58,7 +58,6 @@ export default function AppRoutes() {
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="messages" element={<AdminMessages />} />
         <Route path="information" element={<AdminCourtInfo />} />
-        <Route path="list" element={<AdminGuestList />} />
         <Route path="notice" element={<AdminNoticesPage />} />
         <Route path="event" element={<AdminEventsPage />} />
         <Route path="documents" element={<AdminOath />} />
@@ -86,6 +85,7 @@ export default function AppRoutes() {
         <Route path="events" element={<JudgeEventsPage />} />
         <Route path="documents" element={<JudgesReligion />} />
         <Route path="gallery" element={<JudgeGallery />} />
+        <Route path="utilities" element={<JudgeUtilities />} />
 
         {/* Default redirect for /judge */}
         <Route index element={<Navigate to="dashboard" replace />} />

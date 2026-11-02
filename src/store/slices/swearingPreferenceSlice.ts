@@ -3,6 +3,7 @@ import {
   createAsyncThunk,
   type PayloadAction,
 } from "@reduxjs/toolkit";
+import { AxiosError } from "axios";
 import { api } from "../../api/axios";
 
 /* =====================================================
@@ -32,6 +33,19 @@ export interface Presentation {
   targetAudience: UserRole[];
 }
 
+// Defines the data structure returned by your backend "data" field
+export interface CeremonyData {
+  judges?: Judge[];
+  presentations?: Presentation[];
+}
+
+// Standard API response wrapper
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+}
+
 interface CeremonyState {
   judges: Judge[];
   presentations: Presentation[];
@@ -52,94 +66,100 @@ const initialState: CeremonyState = {
     ASYNC THUNKS
 ===================================================== */
 
-export const fetchCeremonyInfo = createAsyncThunk<any, UserRole | undefined, { rejectValue: string }>(
+export const fetchCeremonyInfo = createAsyncThunk<ApiResponse<CeremonyData>, UserRole | undefined, { rejectValue: string }>(
   "ceremony/fetchAll",
   async (role, thunkAPI) => {
     try {
-      const response = await api.get("/oath/court-info", {
+      const response = await api.get<ApiResponse<CeremonyData>>("/oath/court-info", {
         params: role ? { role } : {},
       });
       return response.data;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Failed to fetch ceremony data"
-      );
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch ceremony data");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
 
-export const fetchAdminDashboard = createAsyncThunk<any, void, { rejectValue: string }>(
+export const fetchAdminDashboard = createAsyncThunk<ApiResponse<CeremonyData>, void, { rejectValue: string }>(
   "ceremony/fetchAdmin",
   async (_, thunkAPI) => {
     try {
-      const response = await api.get("/oath/court-info/admin/dashboard");
+      const response = await api.get<ApiResponse<CeremonyData>>("/oath/court-info/admin/dashboard");
       return response.data;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Failed to fetch admin data"
-      );
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch admin data");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
 
-export const addJudgeBio = createAsyncThunk<any, FormData, { rejectValue: string }>(
+export const addJudgeBio = createAsyncThunk<ApiResponse<CeremonyData>, FormData, { rejectValue: string }>(
   "ceremony/addJudge",
   async (formData, thunkAPI) => {
     try {
-      const response = await api.post("/oath/court-info/bios", formData, {
+      const response = await api.post<ApiResponse<CeremonyData>>("/oath/court-info/bios", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       return response.data;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Failed to add judge profile"
-      );
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to add judge profile");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
 
-export const updateJudgeBio = createAsyncThunk<any, { judgeId: string; formData: FormData }, { rejectValue: string }>(
+export const updateJudgeBio = createAsyncThunk<ApiResponse<CeremonyData>, { judgeId: string; formData: FormData }, { rejectValue: string }>(
   "ceremony/updateJudge",
   async ({ judgeId, formData }, thunkAPI) => {
     try {
-      const response = await api.patch(`/oath/court-info/judge/${judgeId}`, formData, {
+      const response = await api.patch<ApiResponse<CeremonyData>>(`/oath/court-info/judge/${judgeId}`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       return response.data;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Failed to update judge profile"
-      );
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to update judge profile");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
 
-export const addPresentation = createAsyncThunk<any, FormData, { rejectValue: string }>(
+export const addPresentation = createAsyncThunk<ApiResponse<CeremonyData>, FormData, { rejectValue: string }>(
   "ceremony/addPresentation",
   async (formData, thunkAPI) => {
     try {
-      const response = await api.post("/oath/court-info/presentations", formData, {
+      const response = await api.post<ApiResponse<CeremonyData>>("/oath/court-info/presentations", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       return response.data;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Failed to upload presentation"
-      );
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to upload presentation");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
 
-export const deleteCeremonyItem = createAsyncThunk<any, { type: "judges" | "presentations"; id: string }, { rejectValue: string }>(
+export const deleteCeremonyItem = createAsyncThunk<ApiResponse<CeremonyData>, { type: "judges" | "presentations"; id: string }, { rejectValue: string }>(
   "ceremony/deleteItem",
   async ({ type, id }, thunkAPI) => {
     try {
-      const response = await api.delete(`/oath/court-info/${type}/${id}`);
+      const response = await api.delete<ApiResponse<CeremonyData>>(`/oath/court-info/${type}/${id}`);
       return response.data;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data?.message || "Failed to delete item"
-      );
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to delete item");
+      }
+      return thunkAPI.rejectWithValue("An unexpected error occurred");
     }
   }
 );
@@ -159,20 +179,20 @@ const ceremonySlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Fetch matchers (Public & Admin)
+      // Fetch matchers
       .addMatcher(
         (action) =>
           action.type === fetchCeremonyInfo.fulfilled.type ||
           action.type === fetchAdminDashboard.fulfilled.type,
-        (state, action: PayloadAction<any>) => {
+        (state, action: PayloadAction<ApiResponse<CeremonyData>>) => {
           state.loading = false;
-          const source = action.payload.data || action.payload;
+          const source = action.payload.data;
           state.judges = source.judges || [];
           state.presentations = source.presentations || [];
         }
       )
 
-      // Mutation matcher (Add, Update, Delete)
+      // Mutation matcher
       .addMatcher(
         (action) =>
           [
@@ -181,10 +201,10 @@ const ceremonySlice = createSlice({
             addPresentation.fulfilled.type,
             deleteCeremonyItem.fulfilled.type,
           ].includes(action.type),
-        (state, action: PayloadAction<any>) => {
+        (state, action: PayloadAction<ApiResponse<CeremonyData>>) => {
           state.loading = false;
           state.success = true;
-          const data = action.payload.data || action.payload;
+          const data = action.payload.data;
           if (data.judges) state.judges = data.judges;
           if (data.presentations) state.presentations = data.presentations;
         }
@@ -203,7 +223,7 @@ const ceremonySlice = createSlice({
       // Rejected
       .addMatcher(
         (action) => action.type.endsWith("/rejected"),
-        (state, action: PayloadAction<any>) => {
+        (state, action: PayloadAction<string | undefined>) => {
           state.loading = false;
           state.error = action.payload || "An unexpected error occurred";
         }

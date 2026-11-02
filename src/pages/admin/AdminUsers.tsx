@@ -12,8 +12,8 @@ import {
   Edit3,
   Check,
   X,
-  Mail, // Added icon
-  Key,  // Added icon
+  Mail,
+  Key,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -26,6 +26,16 @@ import {
   editAdminDetails,
 } from "../../store/slices/adminUserSlice";
 
+// Defined interfaces for strict typing
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  pj: string;
+  role: UserRole;
+  cohort?: number;
+}
+
 type UserRole = "admin" | "judge" | "guest";
 
 const MASTER_ADMIN_EMAIL = import.meta.env.VITE_MASTER_ADMIN_EMAIL;
@@ -37,10 +47,9 @@ const AdminUsers = () => {
 
   const isMasterAdmin = !!MASTER_ADMIN_EMAIL && authUser?.email === MASTER_ADMIN_EMAIL;
 
-  // New User State (Added Email and Password)
   const [newUserName, setNewUserName] = useState("");
-  const [newUserEmail, setNewUserEmail] = useState(""); // New field
-  const [newUserPassword, setNewUserPassword] = useState(""); // New field
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
   const [newUserPJ, setNewUserPJ] = useState("");
   const [newUserCohort, setNewUserCohort] = useState<string>("");
   const [newUserRole, setNewUserRole] = useState<UserRole>("guest");
@@ -64,7 +73,6 @@ const AdminUsers = () => {
   const handleCreateUser = async () => {
     if (!isMasterAdmin) return toast.error("Unauthorized: Master Admin access required");
     
-    // Updated validation check
     if (!newUserName.trim() || !newUserPJ.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
       return toast.error("Name, Email, Password, and PJ Number are mandatory");
     }
@@ -73,8 +81,8 @@ const AdminUsers = () => {
       await dispatch(
         createAdminUser({
           name: newUserName.trim(),
-          email: newUserEmail.trim().toLowerCase(), // Included
-          password: newUserPassword, // Included
+          email: newUserEmail.trim().toLowerCase(),
+          password: newUserPassword,
           pj: newUserPJ.trim().toUpperCase(),
           role: newUserRole,
           cohort: newUserCohort ? parseInt(newUserCohort) : undefined,
@@ -83,17 +91,17 @@ const AdminUsers = () => {
 
       toast.success(`${newUserRole.toUpperCase()} successfully onboarded`);
       setNewUserName("");
-      setNewUserEmail(""); // Reset
-      setNewUserPassword(""); // Reset
+      setNewUserEmail("");
+      setNewUserPassword("");
       setNewUserPJ("");
       setNewUserCohort("");
       setNewUserRole("guest");
-    } catch (err: any) {
-      toast.error(err || "Failed to register personnel");
+    } catch (err) {
+      toast.error(typeof err === "string" ? err : "Failed to register personnel");
     }
   };
 
-  const startEditing = (user: any) => {
+  const startEditing = (user: User) => {
     setEditingId(user._id);
     setEditForm({
       name: user.name,
@@ -116,8 +124,8 @@ const AdminUsers = () => {
       ).unwrap();
       toast.success("Personnel record updated");
       setEditingId(null);
-    } catch (err: any) {
-      toast.error(err || "Failed to update record");
+    } catch (err) {
+      toast.error(typeof err === "string" ? err : "Failed to update record");
     }
   };
 
@@ -128,8 +136,8 @@ const AdminUsers = () => {
     try {
       await dispatch(deleteAdminUser(id)).unwrap();
       toast.success("Record purged from system");
-    } catch (err: any) {
-      toast.error(err || "Failed to delete record");
+    } catch (err) {
+      toast.error(typeof err === "string" ? err : "Failed to delete record");
     }
   };
 
@@ -139,12 +147,12 @@ const AdminUsers = () => {
     try {
       await dispatch(updateAdminUser({ id, updates: { role: newRole } })).unwrap();
       toast.success(`Access level updated to ${newRole.toUpperCase()}`);
-    } catch (err: any) {
-      toast.error(err || "Failed to update authorization");
+    } catch (err) {
+      toast.error(typeof err === "string" ? err : "Failed to update authorization");
     }
   };
 
-  const filteredUsers = users.filter(
+  const filteredUsers = (users as User[]).filter(
     (u) =>
       u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.pj.toLowerCase().includes(searchTerm.toLowerCase())
@@ -171,7 +179,6 @@ const AdminUsers = () => {
 
       <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 md:space-y-8">
         
-        {/* ONBOARDING SECTION UPDATED WITH EMAIL/PASSWORD */}
         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
           {!isMasterAdmin && (
             <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center">
@@ -264,7 +271,6 @@ const AdminUsers = () => {
           </div>
         </section>
 
-        {/* DIRECTORY SECTION */}
         <section className="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
           <div className="px-6 py-5 border-b flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex items-center gap-2">

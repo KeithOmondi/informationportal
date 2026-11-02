@@ -17,13 +17,26 @@ const ResetPassword = () => {
     e.preventDefault();
     if (password !== confirmPassword) return toast.error("Passwords do not match.");
     if (password.length < 10) return toast.error("Password too short.");
+    if (!token) return toast.error("Invalid or missing reset token.");
 
     try {
       await dispatch(finalizePasswordReset({ token, password })).unwrap();
       toast.success("Security credentials updated.");
       navigate("/login");
-    } catch (err: any) {
-      toast.error(err || "Link expired or invalid.");
+    } catch (err) {
+      // Type-safe error handling replacing 'any'
+      let errorMessage = "Link expired or invalid.";
+
+      if (typeof err === "string") {
+        errorMessage = err;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (err && typeof err === "object" && "message" in err) {
+        // Handle Redux Toolkit rejectWithValue objects
+        errorMessage = String((err as { message: unknown }).message);
+      }
+
+      toast.error(errorMessage);
     }
   };
 
@@ -36,28 +49,32 @@ const ResetPassword = () => {
           </div>
         </div>
         
-        <h2 className="text-xl font-serif font-bold text-center text-slate-800">Establish New Password</h2>
-        <p className="text-xs text-center text-slate-500 mt-1 mb-8">Update your registry access credentials.</p>
+        <h2 className="text-xl font-serif font-bold text-center text-slate-800 uppercase tracking-tight">
+          Establish New Password
+        </h2>
+        <p className="text-xs text-center text-slate-500 mt-1 mb-8 italic">
+          Update your registry access credentials.
+        </p>
 
         <form onSubmit={handleReset} className="space-y-4">
-          <div className="relative">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <div className="relative group">
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#355E3B] transition-colors" size={18} />
             <input
               type="password"
               required
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-4 py-3.5 text-sm outline-none focus:border-[#C5A059]"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-4 py-3.5 text-sm outline-none focus:border-[#C5A059] transition-all"
               placeholder="New Password (min 10 chars)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
 
-          <div className="relative">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <div className="relative group">
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#355E3B] transition-colors" size={18} />
             <input
               type="password"
               required
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-4 py-3.5 text-sm outline-none focus:border-[#C5A059]"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-4 py-3.5 text-sm outline-none focus:border-[#C5A059] transition-all"
               placeholder="Confirm New Password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -66,9 +83,15 @@ const ResetPassword = () => {
 
           <button
             disabled={loading}
-            className="w-full bg-[#355E3B] text-white py-4 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2"
+            className="w-full bg-[#355E3B] text-white py-4 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-[#2a4b2f] active:scale-[0.98] disabled:opacity-70 transition-all shadow-lg shadow-[#355E3B]/10"
           >
-            {loading ? <Loader2 className="animate-spin" size={16} /> : "Update Credentials"}
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin" size={16} /> Initializing Update...
+              </>
+            ) : (
+              "Update Credentials"
+            )}
           </button>
         </form>
       </div>

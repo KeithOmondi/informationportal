@@ -23,7 +23,7 @@ const Login: React.FC = () => {
   const [pj, setPj] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false); // Added for password visibility
+  const [showPassword, setShowPassword] = useState(false);
 
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -65,7 +65,7 @@ const Login: React.FC = () => {
     setPj("");
     setEmail("");
     setPassword("");
-    setShowPassword(false); // Reset visibility on mode switch
+    setShowPassword(false);
     dispatch(clearError());
   };
 
@@ -97,8 +97,20 @@ const Login: React.FC = () => {
         });
         dispatch(initPushSubscription());
       }
-    } catch (err: any) {
-      toast.error(err || "Authentication Failed", { id: toastId });
+    } catch (err) {
+      // Type-safe error handling replacing 'any'
+      let errorMessage = "Authentication Failed";
+
+      if (typeof err === "string") {
+        errorMessage = err;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (err && typeof err === "object" && "message" in err) {
+        // Specifically extracts the message from Redux rejectWithValue objects
+        errorMessage = String((err as { message: unknown }).message);
+      }
+
+      toast.error(errorMessage, { id: toastId });
     }
   };
 

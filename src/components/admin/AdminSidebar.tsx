@@ -20,9 +20,6 @@ import {
 import { useDispatch } from "react-redux";
 import { useAppSelector } from "../../store/hooks";
 import type { AppDispatch } from "../../store/store";
-/* ===========================
-    FIX 1: Import from authSlice
-   =========================== */
 import { subscribeUserToPush } from "../../store/slices/pushSlice";
 import { logoutUser } from "../../store/slices/adminAuthSlice";
 
@@ -37,17 +34,18 @@ const AdminSidebar: React.FC = () => {
   );
   const { unreadCount } = useAppSelector((state) => state.adminChat);
 
-  /* ===========================
-      FIX 2: Required argument
-     =========================== */
+  /* ============================================================
+      FIX: Required argument & ESLint Unused Var Fix
+     ============================================================ */
   const handleLogout = async () => {
     try {
-      // Pass 'false' for the allDevices parameter
+      // Pass 'false' for the allDevices parameter to satisfy the thunk
       await dispatch(logoutUser(false)).unwrap();
       setIsOpen(false);
       navigate("/admin/login");
-    } catch (error) {
-      // Local state is cleared by the slice matcher regardless of server response
+    } catch {
+      // Empty catch block handles the case where local state is cleared 
+      // by the slice matcher regardless of a successful server response.
       setIsOpen(false);
       navigate("/admin/login");
     }
@@ -142,87 +140,28 @@ const AdminSidebar: React.FC = () => {
           </div>
 
           <nav className="space-y-1.5">
-            <NavLink
-              to="/admin/dashboard"
-              onClick={() => setIsOpen(false)}
-              className={({ isActive }) =>
-                `${linkClass} ${isActive ? activeClass : inactiveClass}`
-              }
-            >
-              <LayoutDashboard size={18} /> Dashboard
-            </NavLink>
-            <NavLink
-              to="/admin/information"
-              onClick={() => setIsOpen(false)}
-              className={({ isActive }) =>
-                `${linkClass} ${isActive ? activeClass : inactiveClass}`
-              }
-            >
-              <PinIcon size={18} /> Conference Information
-            </NavLink>
-            <NavLink
-              to="/admin/documents"
-              onClick={() => setIsOpen(false)}
-              className={({ isActive }) =>
-                `${linkClass} ${isActive ? activeClass : inactiveClass}`
-              }
-            >
-              <Book size={18} /> Documents
-            </NavLink>
-            <NavLink
-              to="/admin/messages"
-              onClick={() => setIsOpen(false)}
-              className={({ isActive }) =>
-                `${linkClass} ${isActive ? activeClass : inactiveClass}`
-              }
-            >
-              <MessageSquare size={18} /> Messages
-            </NavLink>
-            <NavLink
-              to="/admin/notice"
-              onClick={() => setIsOpen(false)}
-              className={({ isActive }) =>
-                `${linkClass} ${isActive ? activeClass : inactiveClass}`
-              }
-            >
-              <Users size={18} /> Notice Board
-            </NavLink>
-            <NavLink
-              to="/admin/event"
-              onClick={() => setIsOpen(false)}
-              className={({ isActive }) =>
-                `${linkClass} ${isActive ? activeClass : inactiveClass}`
-              }
-            >
-              <Users size={18} /> Events
-            </NavLink>
-            <NavLink
-              to="/admin/gallery"
-              onClick={() => setIsOpen(false)}
-              className={({ isActive }) =>
-                `${linkClass} ${isActive ? activeClass : inactiveClass}`
-              }
-            >
-              <GalleryThumbnails size={18} /> Gallery
-            </NavLink>
-            <NavLink
-              to="/admin/users"
-              onClick={() => setIsOpen(false)}
-              className={({ isActive }) =>
-                `${linkClass} ${isActive ? activeClass : inactiveClass}`
-              }
-            >
-              <User size={18} /> Users
-            </NavLink>
-            <NavLink
-              to="/admin/program"
-              onClick={() => setIsOpen(false)}
-              className={({ isActive }) =>
-                `${linkClass} ${isActive ? activeClass : inactiveClass}`
-              }
-            >
-              <BookA size={18} /> Programme
-            </NavLink>
+            {[
+              { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+              { to: "/admin/information", icon: PinIcon, label: "Conference Info" },
+              { to: "/admin/documents", icon: Book, label: "Documents" },
+              { to: "/admin/messages", icon: MessageSquare, label: "Messages" },
+              { to: "/admin/notice", icon: Users, label: "Notice Board" },
+              { to: "/admin/event", icon: Users, label: "Events" },
+              { to: "/admin/gallery", icon: GalleryThumbnails, label: "Gallery" },
+              { to: "/admin/users", icon: User, label: "Users" },
+              { to: "/admin/program", icon: BookA, label: "Programme" },
+            ].map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                onClick={() => setIsOpen(false)}
+                className={({ isActive }) =>
+                  `${linkClass} ${isActive ? activeClass : inactiveClass}`
+                }
+              >
+                <link.icon size={18} /> {link.label}
+              </NavLink>
+            ))}
           </nav>
         </div>
 

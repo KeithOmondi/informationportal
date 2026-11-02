@@ -3,11 +3,11 @@ import { useDispatch, useSelector } from "react-redux";
 import HTMLFlipBook from "react-pageflip";
 import {
   ChevronRight, X, Download, Loader2, FileText,
-  Film, Image as ImageIcon, Play, Lock, Clock
+  Film, Image as ImageIcon, Play, Lock, Clock, Users
 } from "lucide-react";
 import type { AppDispatch, RootState } from "../../store/store";
 import { fetchProgram } from "../../store/slices/programSlice";
-import type { AudienceRole } from "../../store/slices/programSlice";
+import type { AudienceRole, Activity, DaySchedule } from "../../store/slices/programSlice";
 import { fetchCeremonyInfo, type Judge } from "../../store/slices/swearingPreferenceSlice";
 import { fetchPresentations, type Presentation } from "../../store/slices/presentationSlice";
 
@@ -36,7 +36,83 @@ const formatName = (str: string) => {
 };
 
 /* =====================================================
-    COUNTDOWN COMPONENT
+    SUB-COMPONENTS
+===================================================== */
+
+const TimeUnit = ({ value, label }: { value: number, label: string }) => (
+  <div className="flex flex-col items-center px-4">
+    <span className="text-3xl sm:text-5xl font-serif font-bold text-[#355E3B]">
+      {String(value).padStart(2, '0')}
+    </span>
+    <span className="text-[10px] font-black uppercase tracking-widest text-[#C5A059] mt-1">{label}</span>
+  </div>
+);
+
+const renderSchedulePage = (day: DaySchedule, activities: Activity[], pageNum: number, isCont: boolean, dayIdx: number) => {
+  return (
+    <Page key={`day-${dayIdx}-p-${pageNum}`} number={pageNum}>
+      <div className="flex flex-col h-full">
+        <header className="border-b-2 border-[#355E3B]/20 pb-3 mb-4 shrink-0">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-[#355E3B] font-serif text-base font-bold uppercase">
+                Day {day.day}{isCont && <span className="text-[#C5A059] ml-2 text-[10px] italic">(Cont.)</span>}
+              </h2>
+              <p className="text-[#C5A059] text-[9px] font-black uppercase tracking-widest">
+                {day.date ? new Date(day.date).toLocaleDateString("en-KE", { day: "numeric", month: "long", year: "numeric" }) : ""}
+              </p>
+            </div>
+          </div>
+          
+          {/* Support for session_chairs array in DaySchedule */}
+          {day.session_chairs && day.session_chairs.length > 0 && !isCont && (
+            <div className="mt-2 flex items-center gap-2 py-1.5 px-3 bg-[#355E3B]/5 rounded-lg border border-[#355E3B]/10">
+              <Users size={12} className="text-[#355E3B]" />
+              <p className="text-[9px] font-bold text-[#355E3B] uppercase tracking-tight">
+                Chairs: {day.session_chairs.map(name => formatName(name)).join(" & ")}
+              </p>
+            </div>
+          )}
+        </header>
+
+        <div className="flex-1 space-y-4">
+          {activities.map((act, i) => (
+            <div key={act._id || i} className="flex gap-4 border-b border-slate-100/60 pb-3 last:border-0 items-start">
+              <span className="text-[#355E3B] font-mono text-[10px] font-bold shrink-0 mt-1 bg-slate-100/50 px-2 py-0.5 rounded">
+                {act.time}
+              </span>
+              <div className="flex-1">
+                <p className="text-[11px] font-serif font-bold text-slate-900 leading-tight uppercase">
+                  {act.activity}
+                </p>
+                
+                {act.facilitator && (
+                  <div className="mt-1 space-y-0.5">
+                    {act.facilitator.split("\n").map((name: string, idx: number) => (
+                      <p key={idx} className="text-[9px] text-[#355E3B] italic flex items-start gap-1">
+                        <span className="text-[#C5A059]">•</span> {formatName(name.trim())}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {/* Support for session_chair in Activity interface */}
+                {act.session_chair && (
+                  <p className="mt-1 text-[8px] font-black text-[#C5A059] uppercase tracking-tighter">
+                    Moderator: {formatName(act.session_chair)}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Page>
+  );
+};
+
+/* =====================================================
+    RELEASE COUNTDOWN
 ===================================================== */
 const ReleaseCountdown: React.FC<{ targetDate: string }> = ({ targetDate }) => {
   const [timeLeft, setTimeLeft] = useState({
@@ -63,15 +139,6 @@ const ReleaseCountdown: React.FC<{ targetDate: string }> = ({ targetDate }) => {
     }, 1000);
     return () => clearInterval(timer);
   }, [targetDate]);
-
-  const TimeUnit = ({ value, label }: { value: number, label: string }) => (
-    <div className="flex flex-col items-center px-4">
-      <span className="text-3xl sm:text-5xl font-serif font-bold text-[#355E3B]">
-        {String(value).padStart(2, '0')}
-      </span>
-      <span className="text-[10px] font-black uppercase tracking-widest text-[#C5A059] mt-1">{label}</span>
-    </div>
-  );
 
   return (
     <div className="flex flex-col items-center justify-center py-12 px-6 bg-white border border-slate-100 rounded-[2rem] shadow-xl max-w-md mx-auto animate-in zoom-in duration-500">
@@ -212,7 +279,7 @@ const JudgesReligion = () => {
   const flipbookKey = useMemo(() => {
     if (!program?.schedule) return "loading";
     return `fb-${program.schedule.length}-${program.isLocked ? "L" : "U"}-${program.targetAudience}`;
-  }, [program?.schedule?.length, program?.isLocked, program?.targetAudience]);
+  }, [program?.schedule, program?.isLocked, program?.targetAudience]);
 
   const programPages = useMemo(() => {
     const pages: JSX.Element[] = [];
@@ -227,14 +294,18 @@ const JudgesReligion = () => {
 
     const scheduleArray = program?.schedule || [];
     if (scheduleArray.length > 0) {
-      const MAX_PAGE_WEIGHT = 1500;
-      scheduleArray.forEach((day: any, dayIdx: number) => {
-        let currentPageActivities: any[] = [];
+      const MAX_PAGE_WEIGHT = 1400; // Adjusted for session chairs header
+      scheduleArray.forEach((day: DaySchedule, dayIdx: number) => {
+        let currentPageActivities: Activity[] = [];
         let currentWeight = 0;
         const activities = day.activities || [];
 
-        activities.forEach((act: any) => {
-          const itemWeight = (act.activity?.length || 0) + (act.facilitator?.length || 0) + 280;
+        activities.forEach((act) => {
+          const itemWeight = 
+            (act.activity?.length || 0) + 
+            (act.facilitator?.length || 0) + 
+            (act.session_chair?.length || 0) + 300;
+
           if (currentWeight + itemWeight > MAX_PAGE_WEIGHT && currentPageActivities.length > 0) {
             pages.push(renderSchedulePage(day, currentPageActivities, pageCounter++, true, dayIdx));
             currentPageActivities = [];
@@ -260,44 +331,6 @@ const JudgesReligion = () => {
 
     return pages;
   }, [program]);
-
-  function renderSchedulePage(day: any, activities: any[], pageNum: number, isCont: boolean, dayIdx: number) {
-    return (
-      <Page key={`day-${dayIdx}-p-${pageNum}`} number={pageNum}>
-        <div className="flex flex-col h-full">
-          <header className="border-b-2 border-[#355E3B]/20 pb-3 mb-4 shrink-0">
-            <h2 className="text-[#355E3B] font-serif text-base font-bold uppercase">
-              Day {day.day}{isCont && <span className="text-[#C5A059] ml-2 text-[10px] italic">(Cont.)</span>}
-            </h2>
-            <p className="text-[#C5A059] text-[9px] font-black uppercase tracking-widest">
-              {day.date ? new Date(day.date).toLocaleDateString("en-KE", { day: "numeric", month: "long", year: "numeric" }) : ""}
-            </p>
-          </header>
-          <div className="flex-1 space-y-4">
-            {activities.map((act: any, i: number) => (
-              <div key={i} className="flex gap-4 border-b border-slate-100/60 pb-3 last:border-0 items-start">
-                <span className="text-[#355E3B] font-mono text-[10px] font-bold shrink-0 mt-1 bg-slate-100/50 px-2 py-0.5 rounded">
-                  {act.time}
-                </span>
-                <div className="flex-1">
-                  <p className="text-[11px] font-serif font-bold text-slate-900 leading-tight uppercase">{act.activity}</p>
-                  {act.facilitator && (
-                    <div className="mt-1 space-y-0.5">
-                      {act.facilitator.split("\n").map((name: string, idx: number) => (
-                        <p key={idx} className="text-[9px] text-[#355E3B] italic flex items-start gap-1">
-                          <span className="text-[#C5A059]">•</span> {formatName(name.trim())}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Page>
-    );
-  }
 
   return (
     <div className="flex flex-col min-h-screen sm:h-[calc(100vh-140px)] max-w-7xl mx-auto bg-white sm:border border-slate-200 sm:rounded-[2.5rem] overflow-hidden shadow-sm">
@@ -342,14 +375,12 @@ const JudgesReligion = () => {
                 <p className="text-slate-500 font-bold text-sm">Program not available</p>
               </div>
             ) : program.isLocked ? (
-              /* ✅ SHOW COUNTDOWN IF LOCKED (NO COVERS) */
               <div className="py-12 w-full">
                 <ReleaseCountdown targetDate={program.scheduledRelease} />
               </div>
             ) : (
-              /* ✅ SHOW FLIPBOOK IF UNLOCKED */
               <div key={flipbookKey} className="relative animate-in fade-in duration-700">
-                {/* @ts-ignore */}
+                {/* @ts-expect-error - react-pageflip lacks native React 18 type support */}
                 <HTMLFlipBook
                   width={bookSize.width}
                   height={bookSize.height}

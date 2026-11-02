@@ -3,11 +3,10 @@ import { useDispatch, useSelector } from "react-redux";
 import HTMLFlipBook from "react-pageflip";
 import {
   ChevronRight, X, Download, Loader2, FileText,
-  Film, Image as ImageIcon, Play, Lock, Clock
+  Film, Image as ImageIcon, Play, Lock, Clock, UserCheck
 } from "lucide-react";
 import type { AppDispatch, RootState } from "../../store/store";
-import { fetchProgram } from "../../store/slices/programSlice";
-import type { AudienceRole } from "../../store/slices/programSlice";
+import { fetchProgram, type DaySchedule, type Activity, type AudienceRole } from "../../store/slices/programSlice";
 import { fetchCeremonyInfo, type Judge } from "../../store/slices/swearingPreferenceSlice";
 import { fetchPresentations, type Presentation } from "../../store/slices/presentationSlice";
 
@@ -28,7 +27,8 @@ const formatName = (str: string) => {
     .map((word) => {
       const cleanWord = word.toUpperCase().replace(/[^A-Z.]/g, "").replace(/\.$/, "");
       if (upperHonors.includes(cleanWord)) return word.toUpperCase();
-      if (mixedHonors[cleanWord] || cleanWord === "RTD") return word.replace(/rtd/i, "Rtd");
+      if (mixedHonors[cleanWord]) return mixedHonors[cleanWord];
+      if (cleanWord === "RTD") return "Rtd.";
       if (cleanWord === "DR") return "Dr.";
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     })
@@ -36,8 +36,17 @@ const formatName = (str: string) => {
 };
 
 /* =====================================================
-    COUNTDOWN COMPONENT
+    SUB-COMPONENTS
 ===================================================== */
+const TimeUnit = ({ value, label }: { value: number; label: string }) => (
+  <div className="flex flex-col items-center px-4">
+    <span className="text-3xl sm:text-5xl font-serif font-bold text-[#355E3B]">
+      {String(value).padStart(2, '0')}
+    </span>
+    <span className="text-[10px] font-black uppercase tracking-widest text-[#C5A059] mt-1">{label}</span>
+  </div>
+);
+
 const ReleaseCountdown: React.FC<{ targetDate: string }> = ({ targetDate }) => {
   const [timeLeft, setTimeLeft] = useState({
     days: 0, hours: 0, minutes: 0, seconds: 0, expired: false
@@ -64,15 +73,6 @@ const ReleaseCountdown: React.FC<{ targetDate: string }> = ({ targetDate }) => {
     return () => clearInterval(timer);
   }, [targetDate]);
 
-  const TimeUnit = ({ value, label }: { value: number, label: string }) => (
-    <div className="flex flex-col items-center px-4">
-      <span className="text-3xl sm:text-5xl font-serif font-bold text-[#355E3B]">
-        {String(value).padStart(2, '0')}
-      </span>
-      <span className="text-[10px] font-black uppercase tracking-widest text-[#C5A059] mt-1">{label}</span>
-    </div>
-  );
-
   return (
     <div className="flex flex-col items-center justify-center py-12 px-6 bg-white border border-slate-100 rounded-[2rem] shadow-xl max-w-md mx-auto animate-in zoom-in duration-500">
       <div className="p-4 bg-[#355E3B]/5 rounded-full mb-6">
@@ -98,9 +98,6 @@ const ReleaseCountdown: React.FC<{ targetDate: string }> = ({ targetDate }) => {
   );
 };
 
-/* =====================================================
-    PRESENTATION CARD
-===================================================== */
 const PresentationCard: React.FC<{ pres: Presentation }> = ({ pres }) => {
   const isVideo = pres.fileType === "video";
   const handleDownload = () => window.open(pres.downloadUrl, "_blank");
@@ -135,39 +132,87 @@ const PresentationCard: React.FC<{ pres: Presentation }> = ({ pres }) => {
   );
 };
 
-/* =====================================================
-    PAGE COMPONENT (FLIPBOOK)
-===================================================== */
-interface PageProps {
-  number: number;
-  children: React.ReactNode;
-  isCover?: boolean;
-}
-
-const Page = React.forwardRef<HTMLDivElement, PageProps>((props, ref) => (
-  <div
-    className={`w-full h-full flex flex-col relative overflow-hidden ${
-      props.isCover ? "bg-white" : "bg-[#fdfbf7]"
-    }`}
-    ref={ref}
-  >
-    <div
-      className={`flex-1 flex flex-col relative z-0 ${
-        !props.isCover
-          ? "m-3 sm:m-6 border border-[#355E3B]/10 p-4 sm:p-8 rounded-sm overflow-hidden bg-white"
-          : "h-full w-full"
-      }`}
-    >
-      {props.children}
-      {!props.isCover && props.number > 1 && (
+const Page = React.forwardRef<HTMLDivElement, { number: number; children: React.ReactNode; isCover?: boolean }>(({ number, children, isCover }, ref) => (
+  <div className={`w-full h-full flex flex-col relative overflow-hidden ${isCover ? "bg-white" : "bg-[#fdfbf7]"}`} ref={ref}>
+    <div className={`flex-1 flex flex-col relative z-0 ${!isCover ? "m-3 sm:m-6 border border-[#355E3B]/10 p-4 sm:p-8 rounded-sm overflow-hidden bg-white" : "h-full w-full"}`}>
+      {children}
+      {!isCover && number > 1 && (
         <div className="absolute bottom-3 right-6 text-[8px] font-black text-slate-400 tracking-widest uppercase bg-inherit px-1">
-          P. {props.number}
+          P. {number}
         </div>
       )}
     </div>
   </div>
 ));
 Page.displayName = "Page";
+
+const SchedulePage = ({ day, activities, pageNum, isCont }: { day: DaySchedule; activities: Activity[]; pageNum: number; isCont: boolean; dayIdx: number }) => (
+  <Page number={pageNum}>
+    <div className="flex flex-col h-full">
+      <header className="border-b-2 border-[#355E3B]/20 pb-3 mb-4 shrink-0">
+        <h2 className="text-[#355E3B] font-serif text-base font-bold uppercase">
+          Day {day.day}{isCont && <span className="text-[#C5A059] ml-2 text-[10px] italic">(Cont.)</span>}
+        </h2>
+        <p className="text-[#C5A059] text-[9px] font-black uppercase tracking-widest">
+          {day.date ? new Date(day.date).toLocaleDateString("en-KE", { day: "numeric", month: "long", year: "numeric" }) : ""}
+        </p>
+      </header>
+      <div className="flex-1 space-y-4">
+        {activities.map((act, i) => (
+          <div key={i} className="flex gap-4 border-b border-slate-100/60 pb-3 last:border-0 items-start">
+            <span className="text-[#355E3B] font-mono text-[10px] font-bold shrink-0 mt-1 bg-slate-100/50 px-2 py-0.5 rounded">
+              {act.time}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-serif font-bold text-slate-900 leading-tight uppercase">{act.activity}</p>
+              {act.session_chair && (
+                <p className="text-[9px] text-slate-500 font-bold mt-1 flex items-center gap-1">
+                  <UserCheck size={10} className="text-[#C5A059]" /> 
+                  Chair: {formatName(act.session_chair)}
+                </p>
+              )}
+              {act.facilitator && (
+                <div className="mt-1 space-y-0.5">
+                  {act.facilitator.split("\n").map((name, idx) => (
+                    <p key={idx} className="text-[9px] text-[#355E3B] italic flex items-start gap-1">
+                      <span className="text-[#C5A059]">•</span> {formatName(name.trim())}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </Page>
+);
+
+const BioModal: React.FC<{ isOpen: boolean; onClose: () => void; data: Judge | null }> = ({ isOpen, onClose, data }) => {
+  if (!isOpen || !data) return null;
+  return (
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/95 backdrop-blur-md">
+      <div className="relative bg-white w-full max-w-5xl rounded-t-[2.5rem] sm:rounded-[2rem] overflow-hidden shadow-2xl max-h-[95vh] flex flex-col md:flex-row animate-in slide-in-from-bottom sm:zoom-in duration-300">
+        <button onClick={onClose} className="absolute top-4 right-4 z-[60] p-2.5 bg-black/40 text-white rounded-full transition-transform active:scale-95">
+          <X size={20} />
+        </button>
+        <div className="relative w-full md:w-[45%] bg-slate-200 shrink-0 h-[40vh] md:h-auto">
+          <img src={data.imageUrl} className="absolute inset-0 w-full h-full object-cover object-top" alt={data.name} />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#1a2e1d] via-[#1a2e1d]/20 to-transparent opacity-90" />
+          <div className="absolute bottom-0 left-0 w-full p-8">
+            <h3 className="font-serif font-bold text-2xl text-white">{formatName(data.name)}</h3>
+            <p className="text-[#C5A059] font-black text-[10px] uppercase tracking-widest">{data.title}</p>
+          </div>
+        </div>
+        <div className="flex-1 p-8 overflow-y-auto bg-white">
+          <div className="text-slate-600 leading-relaxed font-serif italic whitespace-pre-line text-sm sm:text-base">
+            {data.description}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /* =====================================================
     MAIN COMPONENT
@@ -186,9 +231,9 @@ const DrProgramme = () => {
 
   const fetchedRef = useRef(false);
 
-  const showProgramLoading  = programLoading  && !program;
+  const showProgramLoading = programLoading && !program;
   const showCeremonyLoading = ceremonyLoading && judges.length === 0;
-  const showPresLoading     = presLoading     && presentations.length === 0;
+  const showPresLoading = presLoading && presentations.length === 0;
 
   useEffect(() => {
     const updateSize = () => {
@@ -212,13 +257,12 @@ const DrProgramme = () => {
   const flipbookKey = useMemo(() => {
     if (!program?.schedule) return "loading";
     return `fb-${program.schedule.length}-${program.isLocked ? "L" : "U"}-${program.targetAudience}`;
-  }, [program?.schedule?.length, program?.isLocked, program?.targetAudience]);
+  }, [program]);
 
   const programPages = useMemo(() => {
     const pages: JSX.Element[] = [];
     let pageCounter = 1;
 
-    // Cover
     pages.push(
       <Page key="cover" number={pageCounter++} isCover>
         <img src={DrCover} alt="Cover" className="w-full h-full object-cover" />
@@ -228,15 +272,16 @@ const DrProgramme = () => {
     const scheduleArray = program?.schedule || [];
     if (scheduleArray.length > 0) {
       const MAX_PAGE_WEIGHT = 1500;
-      scheduleArray.forEach((day: any, dayIdx: number) => {
-        let currentPageActivities: any[] = [];
+      scheduleArray.forEach((day, dayIdx) => {
+        let currentPageActivities: Activity[] = [];
         let currentWeight = 0;
         const activities = day.activities || [];
 
-        activities.forEach((act: any) => {
-          const itemWeight = (act.activity?.length || 0) + (act.facilitator?.length || 0) + 280;
+        activities.forEach((act) => {
+          const itemWeight = (act.activity?.length || 0) + (act.facilitator?.length || 0) + (act.session_chair?.length || 0) + 280;
+          
           if (currentWeight + itemWeight > MAX_PAGE_WEIGHT && currentPageActivities.length > 0) {
-            pages.push(renderSchedulePage(day, currentPageActivities, pageCounter++, true, dayIdx));
+            pages.push(<SchedulePage key={`day-${dayIdx}-p-${pageCounter}`} day={day} activities={currentPageActivities} pageNum={pageCounter++} isCont={true} dayIdx={dayIdx} />);
             currentPageActivities = [];
             currentWeight = 0;
           }
@@ -246,12 +291,11 @@ const DrProgramme = () => {
 
         if (currentPageActivities.length > 0) {
           const isCont = activities.length > 0 && currentPageActivities[0] !== activities[0];
-          pages.push(renderSchedulePage(day, currentPageActivities, pageCounter++, isCont, dayIdx));
+          pages.push(<SchedulePage key={`day-${dayIdx}-p-${pageCounter}`} day={day} activities={currentPageActivities} pageNum={pageCounter++} isCont={isCont} dayIdx={dayIdx} />);
         }
       });
     }
 
-    // Back Cover
     pages.push(
       <Page key="back-cover" number={pageCounter++} isCover>
         <img src={DrBack} alt="Back" className="w-full h-full object-cover" />
@@ -260,44 +304,6 @@ const DrProgramme = () => {
 
     return pages;
   }, [program]);
-
-  function renderSchedulePage(day: any, activities: any[], pageNum: number, isCont: boolean, dayIdx: number) {
-    return (
-      <Page key={`day-${dayIdx}-p-${pageNum}`} number={pageNum}>
-        <div className="flex flex-col h-full">
-          <header className="border-b-2 border-[#355E3B]/20 pb-3 mb-4 shrink-0">
-            <h2 className="text-[#355E3B] font-serif text-base font-bold uppercase">
-              Day {day.day}{isCont && <span className="text-[#C5A059] ml-2 text-[10px] italic">(Cont.)</span>}
-            </h2>
-            <p className="text-[#C5A059] text-[9px] font-black uppercase tracking-widest">
-              {day.date ? new Date(day.date).toLocaleDateString("en-KE", { day: "numeric", month: "long", year: "numeric" }) : ""}
-            </p>
-          </header>
-          <div className="flex-1 space-y-4">
-            {activities.map((act: any, i: number) => (
-              <div key={i} className="flex gap-4 border-b border-slate-100/60 pb-3 last:border-0 items-start">
-                <span className="text-[#355E3B] font-mono text-[10px] font-bold shrink-0 mt-1 bg-slate-100/50 px-2 py-0.5 rounded">
-                  {act.time}
-                </span>
-                <div className="flex-1">
-                  <p className="text-[11px] font-serif font-bold text-slate-900 leading-tight uppercase">{act.activity}</p>
-                  {act.facilitator && (
-                    <div className="mt-1 space-y-0.5">
-                      {act.facilitator.split("\n").map((name: string, idx: number) => (
-                        <p key={idx} className="text-[9px] text-[#355E3B] italic flex items-start gap-1">
-                          <span className="text-[#C5A059]">•</span> {formatName(name.trim())}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Page>
-    );
-  }
 
   return (
     <div className="flex flex-col min-h-screen sm:h-[calc(100vh-140px)] max-w-7xl mx-auto bg-white sm:border border-slate-200 sm:rounded-[2.5rem] overflow-hidden shadow-sm">
@@ -330,8 +336,6 @@ const DrProgramme = () => {
       </header>
 
       <main className="flex-1 overflow-y-auto p-4 sm:p-12 bg-[#F8FAFC]/30">
-
-        {/* ── PROGRAM TAB ── */}
         <div className={activeTab === "PROGRAM" ? "block" : "hidden"}>
           <div className="max-w-5xl mx-auto flex flex-col items-center">
             {showProgramLoading ? (
@@ -342,14 +346,12 @@ const DrProgramme = () => {
                 <p className="text-slate-500 font-bold text-sm">Program not available</p>
               </div>
             ) : program.isLocked ? (
-              /* ✅ SHOW COUNTDOWN IF LOCKED (NO COVERS) */
               <div className="py-12 w-full">
                 <ReleaseCountdown targetDate={program.scheduledRelease} />
               </div>
             ) : (
-              /* ✅ SHOW FLIPBOOK IF UNLOCKED */
               <div key={flipbookKey} className="relative animate-in fade-in duration-700">
-                {/* @ts-ignore */}
+                {/* @ts-expect-error - HTMLFlipBook peer dependency type conflicts */}
                 <HTMLFlipBook
                   width={bookSize.width}
                   height={bookSize.height}
@@ -367,7 +369,6 @@ const DrProgramme = () => {
           </div>
         </div>
 
-        {/* ── BIO TAB ── */}
         <div className={activeTab === "BIO" ? "block" : "hidden"}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {showCeremonyLoading && (
@@ -382,7 +383,7 @@ const DrProgramme = () => {
                 className="cursor-pointer bg-white border border-slate-200 p-4 rounded-3xl flex items-center gap-5 hover:border-[#C5A059] transition-all group shadow-sm"
               >
                 <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 border border-slate-100">
-                  <img src={judge.imageUrl} className="w-full h-full object-cover" alt="" />
+                  <img src={judge.imageUrl} className="w-full h-full object-cover" alt={judge.name} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-[14px] font-serif font-bold text-[#355E3B] truncate">{formatName(judge.name)}</h3>
@@ -394,7 +395,6 @@ const DrProgramme = () => {
           </div>
         </div>
 
-        {/* ── PRESENTATION TAB ── */}
         <div className={activeTab === "PRESENTATION" ? "block" : "hidden"}>
           <div className="max-w-6xl mx-auto">
             {showPresLoading ? (
@@ -415,35 +415,6 @@ const DrProgramme = () => {
       </main>
 
       <BioModal isOpen={!!selectedJudge} onClose={() => setSelectedJudge(null)} data={selectedJudge} />
-    </div>
-  );
-};
-
-/* =====================================================
-    BIO MODAL
-===================================================== */
-const BioModal: React.FC<{ isOpen: boolean; onClose: () => void; data: Judge | null }> = ({ isOpen, onClose, data }) => {
-  if (!isOpen || !data) return null;
-  return (
-    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/95 backdrop-blur-md">
-      <div className="relative bg-white w-full max-w-5xl rounded-t-[2.5rem] sm:rounded-[2rem] overflow-hidden shadow-2xl max-h-[95vh] flex flex-col md:flex-row">
-        <button onClick={onClose} className="absolute top-4 right-4 z-[60] p-2.5 bg-black/40 text-white rounded-full transition-transform active:scale-95">
-          <X size={20} />
-        </button>
-        <div className="relative w-full md:w-[45%] bg-slate-200 shrink-0 h-[40vh] md:h-auto">
-          <img src={data.imageUrl} className="absolute inset-0 w-full h-full object-cover object-top" alt="" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#1a2e1d] via-[#1a2e1d]/20 to-transparent opacity-90" />
-          <div className="absolute bottom-0 left-0 w-full p-8">
-            <h3 className="font-serif font-bold text-2xl text-white">{formatName(data.name)}</h3>
-            <p className="text-[#C5A059] font-black text-[10px] uppercase tracking-widest">{data.title}</p>
-          </div>
-        </div>
-        <div className="flex-1 p-8 overflow-y-auto bg-white">
-          <div className="text-slate-600 leading-relaxed font-serif italic whitespace-pre-line text-sm sm:text-base">
-            {data.description}
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

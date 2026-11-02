@@ -2,7 +2,9 @@ import {
   createSlice,
   createAsyncThunk,
   type PayloadAction,
+  type Action,
 } from "@reduxjs/toolkit";
+import { AxiosError } from "axios";
 import { api } from "../../api/axios";
 
 // ==========================
@@ -50,13 +52,18 @@ interface AdminChatState {
   chatMessages: Message[];
   unreadCount: number;
   groups: Group[];
-  stats: Record<string, any>;
+  stats: Record<string, unknown>;
   loading: boolean;
   sending: boolean;
   error?: string;
   totalMessages: number;
   page: number;
   pages: number;
+}
+
+interface ChatResponse {
+  success: boolean;
+  data: Message[];
 }
 
 const initialState: AdminChatState = {
@@ -78,26 +85,34 @@ const initialState: AdminChatState = {
 // ==========================
 
 export const fetchAllMessages = createAsyncThunk<
-  { success: boolean; data: Message[] }, 
-  { page?: number; limit?: number; isBroadcast?: boolean; receiverId?: string }
+  ChatResponse, 
+  { page?: number; limit?: number; isBroadcast?: boolean; receiverId?: string },
+  { rejectValue: string }
 >("adminChat/fetchAllMessages", async (params, { rejectWithValue }) => {
   try {
-    const { data } = await api.get("/chat/messages", { params });
+    const { data } = await api.get<ChatResponse>("/chat/messages", { params });
     return data;
-  } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to fetch logs");
+  } catch (err) {
+    if (err instanceof AxiosError) {
+      return rejectWithValue(err.response?.data?.message || "Failed to fetch logs");
+    }
+    return rejectWithValue("An unknown error occurred");
   }
 });
 
 export const fetchChatMessages = createAsyncThunk<
-  { success: boolean; data: Message[] },
-  { receiverId?: string; groupId?: string; isBroadcast?: boolean; page?: number; limit?: number }
+  ChatResponse,
+  { receiverId?: string; groupId?: string; isBroadcast?: boolean; page?: number; limit?: number },
+  { rejectValue: string }
 >("adminChat/fetchChatMessages", async (params, { rejectWithValue }) => {
   try {
-    const { data } = await api.get("/chat/messages", { params });
+    const { data } = await api.get<ChatResponse>("/chat/messages", { params });
     return data;
-  } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to fetch thread");
+  } catch (err) {
+    if (err instanceof AxiosError) {
+      return rejectWithValue(err.response?.data?.message || "Failed to fetch thread");
+    }
+    return rejectWithValue("An unknown error occurred");
   }
 });
 
@@ -112,7 +127,8 @@ export const sendMessage = createAsyncThunk<
     audience?: MessageAudience;
     targetRole?: "judge" | "dr";
     groupId?: string;
-  }
+  },
+  { rejectValue: string }
 >("adminChat/sendMessage", async (payload, { rejectWithValue }) => {
   try {
     const formData = new FormData();
@@ -135,61 +151,75 @@ export const sendMessage = createAsyncThunk<
       }
     }
 
-    const { data } = await api.post("/chat/admin/send", formData, {
+    const { data } = await api.post<{ data: Message | Message[] }>("/chat/admin/send", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return data.data;
-  } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Failed to send message");
+  } catch (err) {
+    if (err instanceof AxiosError) {
+      return rejectWithValue(err.response?.data?.message || "Failed to send message");
+    }
+    return rejectWithValue("An unknown error occurred");
   }
 });
 
-// RESTORED: Fetch Stats for AdminDashboard
-export const fetchStats = createAsyncThunk<Record<string, any>>(
+export const fetchStats = createAsyncThunk<Record<string, unknown>, void, { rejectValue: string }>(
   "adminChat/fetchStats",
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await api.get("/chat/admin/stats");
+      const { data } = await api.get<Record<string, unknown>>("/chat/admin/stats");
       return data;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Stats unavailable");
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        return rejectWithValue(err.response?.data?.message || "Stats unavailable");
+      }
+      return rejectWithValue("An unknown error occurred");
     }
   }
 );
 
-// RESTORED: Group Management
-export const fetchAdminGroups = createAsyncThunk<Group[]>(
+export const fetchAdminGroups = createAsyncThunk<Group[], void, { rejectValue: string }>(
   "adminChat/fetchGroups",
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await api.get("/chat/admin/groups");
+      const { data } = await api.get<Group[]>("/chat/admin/groups");
       return data;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to fetch groups");
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        return rejectWithValue(err.response?.data?.message || "Failed to fetch groups");
+      }
+      return rejectWithValue("An unknown error occurred");
     }
   }
 );
 
 export const createAdminGroup = createAsyncThunk<
   Group,
-  { name: string; description?: string; members?: string[] }
+  { name: string; description?: string; members?: string[] },
+  { rejectValue: string }
 >("adminChat/createGroup", async (payload, { rejectWithValue }) => {
   try {
-    const { data } = await api.post("/chat/admin/groups", payload);
+    const { data } = await api.post<Group>("/chat/admin/groups", payload);
     return data;
-  } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || "Group creation failed");
+  } catch (err) {
+    if (err instanceof AxiosError) {
+      return rejectWithValue(err.response?.data?.message || "Group creation failed");
+    }
+    return rejectWithValue("An unknown error occurred");
   }
 });
 
-export const purgeMessagePermanently = createAsyncThunk(
+export const purgeMessagePermanently = createAsyncThunk<string, string, { rejectValue: string }>(
   "adminChat/purgeMessage",
-  async (messageId: string, { rejectWithValue }) => {
+  async (messageId, { rejectWithValue }) => {
     try {
       await api.delete(`/chat/admin/messages/${messageId}/purge`);
       return messageId;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Purge failed");
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        return rejectWithValue(err.response?.data?.message || "Purge failed");
+      }
+      return rejectWithValue("An unknown error occurred");
     }
   }
 );
@@ -274,7 +304,7 @@ const adminChatSlice = createSlice({
         state.messages = state.messages.filter(m => m._id !== action.payload);
       })
       .addMatcher(
-        (action): action is any => action.type.endsWith("/pending"),
+        (action): action is Action => action.type.endsWith("/pending"),
         (state, action) => {
           if (action.type.includes("sendMessage")) {
             state.sending = true;
@@ -284,11 +314,11 @@ const adminChatSlice = createSlice({
         }
       )
       .addMatcher(
-        (action): action is any => action.type.endsWith("/rejected"),
+        (action): action is PayloadAction<string> => action.type.endsWith("/rejected"),
         (state, action) => {
           state.loading = false;
           state.sending = false;
-          state.error = action.payload as string;
+          state.error = action.payload;
         }
       );
   },

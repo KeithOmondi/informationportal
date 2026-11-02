@@ -8,7 +8,7 @@ import {
   type IEvent,
   type EventFilter,
   type EventStatus,
-  type EventAudience, // Added from slice
+  type EventAudience,
 } from "../../store/slices/eventSlice";
 import { 
   Plus, Trash2, Edit2, MapPin, 
@@ -17,6 +17,17 @@ import {
   AlertCircle,
 } from "lucide-react";
 import toast from "react-hot-toast";
+
+interface FormState {
+  title: string;
+  description: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  status: EventStatus;
+  targetAudience: EventAudience;
+  isMandatory: string;
+}
 
 const getTimeRemaining = (startDate: string) => {
   const total = Date.parse(startDate) - Date.now();
@@ -39,14 +50,14 @@ const AdminEventsPage = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormState>({
     title: "",
     description: "",
     location: "",
     startDate: "",
     endDate: "",
-    status: "SCHEDULED" as EventStatus,
-    targetAudience: "ALL" as EventAudience, // New Field
+    status: "SCHEDULED",
+    targetAudience: "ALL",
     isMandatory: "false"
   });
 
@@ -115,14 +126,21 @@ const AdminEventsPage = () => {
         toast.success("Protocol published");
       }
       setShowModal(false);
-    } catch (err: any) {
-      toast.error(err || "Save failed");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : typeof err === "string" ? err : "Save failed";
+      toast.error(errorMessage);
     }
   };
 
   const handleDelete = (id: string) => {
     if (window.confirm("Permanently strike this record?")) {
-      dispatch(deleteEvent(id)).unwrap().then(() => toast.success("Record purged"));
+      dispatch(deleteEvent(id))
+        .unwrap()
+        .then(() => toast.success("Record purged"))
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : "Deletion failed";
+          toast.error(msg);
+        });
     }
   };
 
@@ -234,7 +252,6 @@ const AdminEventsPage = () => {
             </div>
 
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
-              {/* IMAGE UPLOADER */}
               <div 
                 onClick={() => fileInputRef.current?.click()}
                 className="relative aspect-[21/9] w-full rounded-xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden cursor-pointer hover:border-[#1a3a32]/30 transition-colors"
@@ -251,7 +268,6 @@ const AdminEventsPage = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                {/* AUDIENCE SELECTOR - TOGGLE GROUP */}
                 <div className="col-span-2">
                   <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Target Audience</label>
                   <div className="grid grid-cols-3 gap-2">
@@ -331,7 +347,6 @@ const AdminEventsPage = () => {
               </div>
             </div>
 
-            {/* FOOTER */}
             <div className="p-4 bg-slate-50 flex gap-2 justify-end border-t border-slate-100">
               <button onClick={() => setShowModal(false)} className="px-4 py-2 text-slate-400 text-[10px] font-black uppercase hover:bg-slate-200 rounded-lg transition-all">Discard</button>
               <button onClick={handleSubmit} disabled={loading} className="px-6 py-2 bg-[#1a3a32] text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md disabled:opacity-50">
