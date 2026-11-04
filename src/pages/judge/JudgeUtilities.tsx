@@ -16,6 +16,8 @@ interface Bill {
   acknowledgedAt: string | null;
   billUrl: string | null;
   sentByYou: boolean;
+  /** The staff member who entered the bill, when the judge did not. */
+  addedBy?: string | null;
   editable: boolean;
 }
 
@@ -236,7 +238,7 @@ export default function JudgeUtilities() {
                     <p className="text-sm text-slate-600">{money(b.amount)}</p>
                     <p className="text-xs text-slate-400">
                       {b.acknowledgedAt ? `Received by the Registry ${new Date(b.acknowledgedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}` : b.dateReceived ? `Sent ${new Date(b.dateReceived).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}` : ""}
-                      {b.sentByYou ? "" : " · added by the Registry"}
+                      {b.sentByYou ? "" : ` · added by ${b.addedBy ?? "the Registry"}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
