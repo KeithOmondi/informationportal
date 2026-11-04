@@ -154,7 +154,6 @@ export default function JudgeUtilities() {
         <div>
           <h1 className="font-serif text-2xl font-bold text-[#355E3B]">My Utilities</h1>
           <p className="text-sm text-slate-500">
-            Add your utility bills here instead of emailing them to the Registry.
             {listing.name ? ` ${listing.name}${listing.pj ? ` · PJ ${listing.pj}` : ""}` : ""}
           </p>
         </div>
