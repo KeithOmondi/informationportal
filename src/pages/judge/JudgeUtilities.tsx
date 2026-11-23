@@ -216,7 +216,7 @@ export default function JudgeUtilities() {
             className="inline-flex items-center gap-2 rounded-xl bg-[#355E3B] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#2b4d30] disabled:opacity-60"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : editing ? <Pencil size={16} /> : <Plus size={16} />}
-            {editing ? "Save changes" : "Send to the Registry"}
+            {editing ? "Save changes" : "Submit to Judges Support Help Desk"}
           </button>
         </form>
       )}
