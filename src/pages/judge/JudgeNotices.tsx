@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, type JSX } from "react";
+import { useEffect, useMemo, useState, useRef, type JSX } from "react";
 import {
   Download,
   Search,
@@ -29,10 +29,34 @@ const JudgeNoticesPage = () => {
   const dispatch = useAppDispatch();
   const { notices, loading } = useAppSelector((state) => state.notices);
 
-  const [filter, setFilter] = useState<"ALL" | NoticePriority>("ALL");
+  type Tab = "ALL" | "NEW" | "PAST" | "URGENT";
+  const [filter, setFilter] = useState<Tab>("ALL");
   const [search, setSearch] = useState("");
+  const [now] = useState(() => Date.now());
 
-  const categories: ("ALL" | NoticePriority)[] = ["ALL", "NORMAL", "URGENT"];
+  const categories: Tab[] = ["ALL", "NEW", "PAST", "URGENT"];
+  const NEW_DAYS = 7;
+
+  // A notice is "new" for a week after it is published, as long as it has not expired. After that it is "past".
+  const isNew = (n: { publishDate?: string; createdAt: string; expiryDate?: string }): boolean => {
+    const published = new Date(n.publishDate ?? n.createdAt).getTime();
+    const expired = n.expiryDate ? new Date(n.expiryDate).getTime() < now : false;
+    return !expired && now - published <= NEW_DAYS * 24 * 60 * 60 * 1000;
+  };
+
+  const counts = useMemo(() => {
+    const fresh = notices.filter(isNew).length;
+    return { ALL: notices.length, NEW: fresh, PAST: notices.length - fresh, URGENT: notices.filter((n) => n.priority === "URGENT").length };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notices, now]);
+
+  const visible = useMemo(() => {
+    if (filter === "NEW") return notices.filter(isNew);
+    if (filter === "PAST") return notices.filter((n) => !isNew(n));
+    if (filter === "URGENT") return notices.filter((n) => n.priority === "URGENT");
+    return notices;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notices, filter, now]);
 
   /**
    * FIX: PERSIST DEBOUNCED FUNCTION
@@ -40,9 +64,8 @@ const JudgeNoticesPage = () => {
    * on every render, while keeping the callback simple for React's analyzer.
    */
   const debouncedFetchRef = useRef(
-    debounce((currentFilter: "ALL" | NoticePriority, currentSearch: string) => {
+    debounce((currentSearch: string) => {
       const params: FetchNoticesParams = {};
-      if (currentFilter !== "ALL") params.priority = currentFilter;
       if (currentSearch) params.search = currentSearch;
       dispatch(fetchNotices(params));
     }, 500)
@@ -58,8 +81,8 @@ const JudgeNoticesPage = () => {
 
   // Trigger fetch when dependencies change
   useEffect(() => {
-    debouncedFetchRef.current(filter, search);
-  }, [filter, search]);
+    debouncedFetchRef.current(search);
+  }, [search]);
 
   const formatFileSize = (size?: number): string => {
     if (!size) return "0.00 MB";
@@ -127,7 +150,16 @@ const JudgeNoticesPage = () => {
                   : "text-slate-400 hover:text-slate-600"
               }`}
             >
-              {cat}
+              {cat === "ALL" ? "All" : cat === "NEW" ? "New" : cat === "PAST" ? "Past" : "Urgent"}
+              {cat !== "ALL" && counts[cat] > 0 && (
+                <span
+                  className={`ml-2 rounded-full px-1.5 py-0.5 text-[9px] ${
+                    cat === "NEW" ? "bg-[#C5A059] text-[#14301f]" : cat === "URGENT" ? "bg-red-100 text-red-600" : "bg-slate-200 text-slate-500"
+                  }`}
+                >
+                  {counts[cat]}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -149,19 +181,19 @@ const JudgeNoticesPage = () => {
 
       {/* LISTING */}
       <div className="space-y-8">
-        {loading && notices.length === 0 ? (
+        {loading && visible.length === 0 && notices.length === 0 ? (
           <div className="py-32 flex flex-col items-center justify-center space-y-4">
             <LoaderIcon />
           </div>
-        ) : notices.length === 0 ? (
+        ) : visible.length === 0 ? (
           <div className="py-32 bg-slate-50 rounded-[40px] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center px-6">
             <Inbox className="text-slate-200 mb-4" size={64} />
             <h3 className="text-slate-500 font-black uppercase tracking-widest text-xs">
-              No Records Found
+              {filter === "NEW" ? "Nothing new this week" : filter === "PAST" ? "No past notices" : "No Records Found"}
             </h3>
           </div>
         ) : (
-          notices.map((notice) => (
+          visible.map((notice) => (
             <div
               key={notice._id}
               className="group bg-white border border-slate-200 rounded-[32px] overflow-hidden hover:shadow-2xl hover:shadow-[#355E3B]/5 transition-all duration-500"
@@ -178,6 +210,9 @@ const JudgeNoticesPage = () => {
                     >
                       {notice.priority}
                     </span>
+                    {isNew(notice) && (
+                      <span className="rounded-full bg-[#C5A059] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-[#14301f]">New</span>
+                    )}
                     {notice.priority === "URGENT" && (
                       <span className="flex items-center gap-2 text-red-600 text-[10px] font-black uppercase animate-pulse">
                         <AlertCircle size={14} /> Critical Action Required
