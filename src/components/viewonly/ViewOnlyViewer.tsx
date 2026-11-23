@@ -7,7 +7,7 @@
 //
 // A website cannot stop a phone photo or a screen recording. The stamp on every page is what makes a leak traceable.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Lock, X } from "lucide-react";
 import { api } from "../../api/axios";
 
@@ -22,11 +22,21 @@ const GREEN = "#1B3A2A";
 const GOLD = "#C9A24A";
 
 /** One page: fetched as a picture, painted onto a canvas. */
-const PageCanvas = ({ docId, pageNo, active, onMissing }: { docId: string; pageNo: number; active: boolean; onMissing: () => void }) => {
+const PageCanvas = ({ docId, pageNo, active }: { docId: string; pageNo: number; active: boolean }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const holderRef = useRef<HTMLDivElement>(null);
+  const startedRef = useRef(false); // a request is made once per attempt, and is never cancelled by a re-render
+  const aliveRef = useRef(true);
   const [state, setState] = useState<"idle" | "loading" | "done" | "failed">("idle");
   const [near, setNear] = useState(pageNo <= 2);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
 
   // Start loading a page a little before it scrolls into view
   useEffect(() => {
@@ -38,33 +48,33 @@ const PageCanvas = ({ docId, pageNo, active, onMissing }: { docId: string; pageN
   }, []);
 
   useEffect(() => {
-    if (!near || !active || state !== "idle") return;
-    let cancelled = false;
-    const t = setTimeout(async () => {
+    if (!near || !active || startedRef.current) return;
+    startedRef.current = true;
+    // Not cancelled when the effect re-runs (changing to "loading" re-runs it): only unmounting stops the paint
+    setTimeout(async () => {
+      if (!aliveRef.current) return;
       setState("loading");
       try {
         const res = await api.get(`/view-docs/${docId}/pages/${pageNo}`, { responseType: "blob", timeout: 90000 });
         const bitmap = await createImageBitmap(res.data as Blob);
-        if (cancelled) return bitmap.close();
         const canvas = canvasRef.current;
-        if (!canvas) return bitmap.close();
+        if (!aliveRef.current || !canvas) return bitmap.close();
         canvas.width = bitmap.width;
         canvas.height = bitmap.height;
         canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
         bitmap.close();
         setState("done");
       } catch {
-        if (!cancelled) {
-          setState("failed");
-          onMissing();
-        }
+        if (aliveRef.current) setState("failed");
       }
     }, 0);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [near, active, state, docId, pageNo, onMissing]);
+  }, [near, active, docId, pageNo, attempt]);
+
+  const retry = () => {
+    startedRef.current = false;
+    setState("idle");
+    setAttempt((a) => a + 1);
+  };
 
   return (
     <div ref={holderRef} className="relative mx-auto w-full max-w-3xl overflow-hidden rounded-sm bg-white shadow-lg" style={{ minHeight: state === "done" ? undefined : 520 }}>
@@ -74,7 +84,7 @@ const PageCanvas = ({ docId, pageNo, active, onMissing }: { docId: string; pageN
           {state === "failed" ? (
             <>
               <p className="text-xs font-semibold">Page {pageNo} could not be loaded.</p>
-              <button onClick={() => setState("idle")} className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50">Try again</button>
+              <button onClick={retry} className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50">Try again</button>
             </>
           ) : (
             <>
@@ -91,7 +101,6 @@ const PageCanvas = ({ docId, pageNo, active, onMissing }: { docId: string; pageN
 const ViewOnlyViewer = ({ doc, onClose }: { doc: ViewDoc; onClose: () => void }) => {
   const [paused, setPaused] = useState(false);
   const [flash, setFlash] = useState(false);
-  const noop = useCallback(() => {}, []);
 
   // Printing prints nothing but a notice
   useEffect(() => {
@@ -171,7 +180,7 @@ const ViewOnlyViewer = ({ doc, onClose }: { doc: ViewDoc; onClose: () => void })
       <div className="relative flex-1 overflow-y-auto px-3 py-6 md:px-8" onContextMenu={block}>
         <div className="space-y-5" style={{ pointerEvents: paused ? "none" : "auto", filter: paused || flash ? "blur(28px)" : "none", transition: "filter 120ms" }}>
           {pages.map((n) => (
-            <PageCanvas key={n} docId={doc.id} pageNo={n} active={!paused} onMissing={noop} />
+            <PageCanvas key={n} docId={doc.id} pageNo={n} active={!paused} />
           ))}
           <p className="pb-6 text-center text-[10px] font-bold uppercase tracking-[0.3em] text-white/30">End of document</p>
         </div>
