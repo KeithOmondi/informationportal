@@ -58,6 +58,15 @@ const NavItem = ({ icon: Icon, label, to, onClick, badge }: NavItemProps) => {
   );
 };
 
+const SectionTitle = ({ children }: { children: string }) => (
+  <div className="px-6 mb-3">
+    <p className="text-[9px] uppercase tracking-[0.2em] text-[#C5A059] font-black flex items-center gap-2">
+      <span className="h-[1px] w-3 bg-[#C5A059]/40" />
+      {children}
+    </p>
+  </div>
+);
+
 const JudgeSidebar = ({ isOpen, setIsOpen }: JudgeSidebarProps) => {
   const dispatch = useAppDispatch();
   const { docs: viewDocs } = useViewDocs();
@@ -114,31 +123,23 @@ const JudgeSidebar = ({ isOpen, setIsOpen }: JudgeSidebarProps) => {
         {/* SCROLLABLE NAVIGATION AREA */}
         <div className="flex-1 overflow-y-auto pt-4 lg:pt-6 scrollbar-hide">
           
-          <div className="px-6 mb-4">
-             <p className="text-[9px] uppercase tracking-[0.2em] text-[#C5A059] font-black flex items-center gap-2">
-              <span className="h-[1px] w-3 bg-[#C5A059]/40" />
-              Core Portals
-            </p>
-          </div>
-
-          <nav className="space-y-0.5 mb-8">
+          <SectionTitle>Conference</SectionTitle>
+          <nav className="space-y-0.5 mb-7">
             <NavItem icon={LayoutDashboard} label="Dashboard" to="/judge/dashboard" onClick={() => setIsOpen(false)} />
             <NavItem icon={BookOpen} label="Conference Information" to="/judge/information" onClick={() => setIsOpen(false)} />
             <NavItem icon={Users} label="Conference Documents" to="/judge/documents" onClick={() => setIsOpen(false)} />
           </nav>
 
-          <div className="px-6 mb-4">
-            <p className="text-[9px] uppercase tracking-[0.2em] text-[#C5A059] font-black flex items-center gap-2">
-              <span className="h-[1px] w-3 bg-[#C5A059]/40" />
-              Communications
-            </p>
-          </div>
-
-          <nav className="space-y-0.5">
+          <SectionTitle>Communications</SectionTitle>
+          <nav className="space-y-0.5 mb-7">
             <NavItem icon={Lock} label="Confidential Correspondence" to="/judge/view-documents" badge={newViewDocs} onClick={() => setIsOpen(false)} />
             <NavItem icon={BellRing} label="Notice Board" to="/judge/notices" onClick={() => setIsOpen(false)} />
             <NavItem icon={Calendar} label="Events" to="/judge/events" onClick={() => setIsOpen(false)} />
             <NavItem icon={ImageIcon} label="Gallery" to="/judge/gallery" onClick={() => setIsOpen(false)} />
+          </nav>
+
+          <SectionTitle>Judges Support</SectionTitle>
+          <nav className="space-y-0.5 pb-4">
             <NavItem icon={Zap} label="My Utilities" to="/judge/utilities" onClick={() => setIsOpen(false)} />
           </nav>
         </div>
