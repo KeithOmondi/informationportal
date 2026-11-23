@@ -11,7 +11,9 @@ import {
   Menu,
   X,
   Calendar,
+  Lock,
 } from "lucide-react";
+import { useViewDocs } from "../viewonly/useViewDocs";
 import { useAppDispatch } from "../../store/hooks";
 import { logoutUser } from "../../store/slices/adminAuthSlice";
 
@@ -22,6 +24,8 @@ interface DrSidebarProps {
 
 const DrSidebar: React.FC<DrSidebarProps> = ({ isOpen, setIsOpen }) => {
   const dispatch = useAppDispatch();
+  const { docs: viewDocs } = useViewDocs();
+  const newViewDocs = (viewDocs ?? []).filter((d) => d.isNew).length;
   const navigate = useNavigate();
 
   /* ============================================================
@@ -139,6 +143,19 @@ const DrSidebar: React.FC<DrSidebarProps> = ({ isOpen, setIsOpen }) => {
               Communications
             </p>
           </div>
+
+            <NavLink
+              to="/dr/view-documents"
+              onClick={() => setIsOpen(false)}
+              className={({ isActive }) =>
+                `${linkClass} ${isActive ? activeClass : inactiveClass}`
+              }
+            >
+              <Lock size={18} /> Confidential Correspondence
+              {newViewDocs > 0 && (
+                <span className="ml-auto rounded-full bg-[#C9A24A] px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-[#14301f]">{newViewDocs} new</span>
+              )}
+            </NavLink>
 
             <NavLink
               to="/dr/notice"

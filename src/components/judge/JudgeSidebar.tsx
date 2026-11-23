@@ -9,8 +9,10 @@ import {
   Image as ImageIcon, 
   Scale,
   Zap,
+  Lock,
   type LucideIcon 
 } from "lucide-react";
+import { useViewDocs } from "../viewonly/useViewDocs";
 import { useAppDispatch } from "../../store/hooks";
 import { logoutUser } from "../../store/slices/adminAuthSlice";
 
@@ -19,6 +21,7 @@ interface NavItemProps {
   label: string;
   to: string;
   onClick?: () => void;
+  badge?: number;
 }
 
 interface JudgeSidebarProps {
@@ -26,7 +29,7 @@ interface JudgeSidebarProps {
   setIsOpen: (open: boolean) => void;
 }
 
-const NavItem = ({ icon: Icon, label, to, onClick }: NavItemProps) => {
+const NavItem = ({ icon: Icon, label, to, onClick, badge }: NavItemProps) => {
   const location = useLocation();
   const active = location.pathname === to;
 
@@ -48,12 +51,17 @@ const NavItem = ({ icon: Icon, label, to, onClick }: NavItemProps) => {
       <span className={`text-sm font-serif font-bold tracking-tight ${active ? "text-[#355E3B]" : "text-slate-600"}`}>
         {label}
       </span>
+      {!!badge && (
+        <span className="ml-auto rounded-full bg-[#C9A24A] px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-[#14301f]">{badge} new</span>
+      )}
     </Link>
   );
 };
 
 const JudgeSidebar = ({ isOpen, setIsOpen }: JudgeSidebarProps) => {
   const dispatch = useAppDispatch();
+  const { docs: viewDocs } = useViewDocs();
+  const newViewDocs = (viewDocs ?? []).filter((d) => d.isNew).length;
   const navigate = useNavigate();
 
   /* ===========================
@@ -127,6 +135,7 @@ const JudgeSidebar = ({ isOpen, setIsOpen }: JudgeSidebarProps) => {
           </div>
 
           <nav className="space-y-0.5">
+            <NavItem icon={Lock} label="Confidential Correspondence" to="/judge/view-documents" badge={newViewDocs} onClick={() => setIsOpen(false)} />
             <NavItem icon={BellRing} label="Notice Board" to="/judge/notices" onClick={() => setIsOpen(false)} />
             <NavItem icon={Calendar} label="Events" to="/judge/events" onClick={() => setIsOpen(false)} />
             <NavItem icon={ImageIcon} label="Gallery" to="/judge/gallery" onClick={() => setIsOpen(false)} />

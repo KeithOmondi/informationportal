@@ -90,7 +90,7 @@ const AdminHeader: React.FC = () => {
   });
 
   return (
-    <header className="h-20 bg-white border-b border-slate-200 px-4 md:px-8 flex items-center justify-between z-[50] sticky top-0">
+    <header className="hidden h-20 sticky top-0 z-[50] items-center justify-between border-b border-slate-200 bg-white px-4 md:px-8 lg:flex">
       {/* Title Section */}
       <div className="flex flex-col min-w-0">
         <div className="flex items-center gap-1 md:gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">

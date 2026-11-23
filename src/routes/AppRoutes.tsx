@@ -36,6 +36,8 @@ import DrProgramme from "../pages/dr/DrProgramme";
 import DrGallery from "../pages/dr/DrGallery";
 import ForgotPassword from "../components/Login/ForgotPassword";
 import ResetPassword from "../components/Login/ResetPassword";
+import AdminViewDocs from "../pages/admin/AdminViewDocs";
+import ViewOnlyLibrary from "../components/viewonly/ViewOnlyLibrary";
 
 export default function AppRoutes() {
   return (
@@ -61,6 +63,7 @@ export default function AppRoutes() {
         <Route path="notice" element={<AdminNoticesPage />} />
         <Route path="event" element={<AdminEventsPage />} />
         <Route path="documents" element={<AdminOath />} />
+        <Route path="view-documents" element={<AdminViewDocs />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="gallery" element={<AdminGallery />} />
         <Route path="program" element={<AdminProgram />} />
@@ -84,6 +87,7 @@ export default function AppRoutes() {
         <Route path="notices" element={<JudgeNoticesPages />} />
         <Route path="events" element={<JudgeEventsPage />} />
         <Route path="documents" element={<JudgesReligion />} />
+        <Route path="view-documents" element={<ViewOnlyLibrary />} />
         <Route path="gallery" element={<JudgeGallery />} />
         <Route path="utilities" element={<JudgeUtilities />} />
 
@@ -103,6 +107,7 @@ export default function AppRoutes() {
         <Route path="notice" element={<DrNotices />} />
         <Route path="information" element={<DrCinfo />} />
         <Route path="documents" element={<DrDocs />} />
+        <Route path="view-documents" element={<ViewOnlyLibrary />} />
         <Route path="events" element={<DrEvents />} />
         <Route path="programme" element={<DrProgramme />} />
         <Route path="gallery" element={<DrGallery />} />

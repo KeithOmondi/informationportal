@@ -46,6 +46,11 @@ const AUDIENCE_OPTIONS: { label: string; value: AudienceRole }[] = [
 const AdminDashboard = () => {
   const dispatch = useAppDispatch();
 
+  const { user: authUser } = useAppSelector((s) => s.auth);
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const adminName = authUser?.name || "Administrator";
+
   // Redux state
   const { users = [] } = useAppSelector((s) => s.users);
   const { events = [], loading: eventsLoading } = useAppSelector(
@@ -163,16 +168,32 @@ const AdminDashboard = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
-        <div>
-          <h1 className="text-[#355E3B] font-serif text-3xl font-bold">
-            Admin Dashboard
-          </h1>
+      {/* WELCOME BANNER */}
+      <div
+        className="relative overflow-hidden rounded-3xl p-7 md:p-9 text-white shadow-lg"
+        style={{ background: "linear-gradient(135deg, #0f2a1c 0%, #1B3A2A 60%, #234a35 100%)" }}
+      >
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+            backgroundSize: "44px 44px",
+          }}
+        />
+        <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#C9A24A]">
+              {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            </p>
+            <h1 className="mt-2 font-serif text-3xl font-bold md:text-4xl">
+              {greeting}, <span className="text-[#C9A24A]">{adminName}</span>
+            </h1>
+            <p className="mt-2 text-sm text-white/60">Everything for the conference, in one place.</p>
+          </div>
+          <button className="flex items-center gap-2 self-start rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-sm transition-all hover:bg-white/20 md:self-auto">
+            <TrendingUp size={14} /> System Analytics
+          </button>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
-          <TrendingUp size={14} /> System Analytics
-        </button>
       </div>
 
       {/* STATS GRID */}
