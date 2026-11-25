@@ -10,11 +10,13 @@ import {
   Scale,
   Zap,
   Lock,
+  PlayCircle,
   type LucideIcon 
 } from "lucide-react";
 import { useViewDocs } from "../viewonly/useViewDocs";
 import { useAppDispatch } from "../../store/hooks";
 import { logoutUser } from "../../store/slices/adminAuthSlice";
+import { OPEN_TUTORIAL_EVENT } from "./TutorialPopup";
 
 interface NavItemProps {
   icon: LucideIcon;
@@ -141,6 +143,14 @@ const JudgeSidebar = ({ isOpen, setIsOpen }: JudgeSidebarProps) => {
           <SectionTitle>Judges Support</SectionTitle>
           <nav className="space-y-0.5 pb-4">
             <NavItem icon={Zap} label="My Utilities" to="/judge/utilities" onClick={() => setIsOpen(false)} />
+            <button
+              type="button"
+              onClick={() => { setIsOpen(false); window.dispatchEvent(new Event(OPEN_TUTORIAL_EVENT)); }}
+              className="flex w-full items-center gap-3 px-6 py-3.5 text-left text-slate-500 transition-all duration-300 hover:bg-slate-50 hover:text-[#355E3B] group"
+            >
+              <PlayCircle size={18} strokeWidth={2} className="text-slate-400 group-hover:text-[#355E3B]" />
+              <span className="font-serif text-sm font-bold tracking-tight text-slate-600">Tutorial</span>
+            </button>
           </nav>
         </div>
 

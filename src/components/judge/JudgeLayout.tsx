@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Outlet } from 'react-router-dom';
 import JudgeHeader from './JudgeHeader';
 import JudgeSidebar from './JudgeSidebar';
+import TutorialPopup from './TutorialPopup';
 
 interface JudgeLayoutProps {
   children?: ReactNode;
@@ -14,6 +15,8 @@ const JudgeLayout = ({ children }: JudgeLayoutProps) => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#FDFDFD]">
+      {/* The welcome tutorial: pops up at sign-in until watched, and can be opened again from the menu */}
+      <TutorialPopup />
       {/* 1. SIDEBAR 
           Controlled via FAB in Header. 
           On Desktop (lg), it stays fixed/sticky on the left.
