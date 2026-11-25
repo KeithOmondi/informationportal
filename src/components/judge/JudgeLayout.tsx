@@ -15,8 +15,8 @@ const JudgeLayout = ({ children }: JudgeLayoutProps) => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#FDFDFD]">
-      {/* The welcome tutorial: pops up at sign-in until watched, and can be opened again from the menu */}
-      <TutorialPopup />
+      {/* The welcome tutorial itself shows on the login page; here it opens from the menu ("Tutorial") */}
+      <TutorialPopup placement="app" />
       {/* 1. SIDEBAR 
           Controlled via FAB in Header. 
           On Desktop (lg), it stays fixed/sticky on the left.

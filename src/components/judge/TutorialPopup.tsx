@@ -1,8 +1,8 @@
 // src/components/judge/TutorialPopup.tsx
 //
-// The tutorial video, shown as a pop-up the first time a judge signs in. It keeps coming back at each sign-in
-// until the judge has watched it to the end or chosen "Don't show again". The judge can always open it again
-// from the menu ("Tutorial").
+// The tutorial video, shown as a pop-up on the login page as soon as someone opens the link, before they sign in.
+// On a given device it keeps coming back until the video has been watched to the end or "Don't show again" was
+// chosen. Inside the app (after sign-in) it only opens from the menu ("Tutorial").
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PlayCircle, X } from "lucide-react";
@@ -17,32 +17,39 @@ interface Tutorial {
 
 export const OPEN_TUTORIAL_EVENT = "open-tutorial";
 
-const TutorialPopup = () => {
+const seenKey = (id: string) => `tutorial-seen-${id}`;
+const readFlag = (store: Storage | undefined, key: string): boolean => {
+  try { return store?.getItem(key) === "1"; } catch { return false; }
+};
+
+/** "login": on the login page, before anyone has signed in (remembers on this device). "app": opened from the menu. */
+const TutorialPopup = ({ placement = "app" }: { placement?: "login" | "app" }) => {
   const [tutorial, setTutorial] = useState<Tutorial | null>(null);
   const [open, setOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const fetchCurrent = useCallback(async (): Promise<Tutorial | null> => {
     try {
-      const { data } = await api.get("/tutorial/current");
+      const { data } = await api.get(placement === "login" ? "/tutorial/public" : "/tutorial/current");
       return (data.tutorial as Tutorial | null) ?? null;
     } catch {
       return null; // the tutorial must never get in the way of signing in
     }
-  }, []);
+  }, [placement]);
 
-  // First: on sign-in, show it if this judge has not seen it (and has not closed it already in this visit)
+  // On the login page: show it right away, unless this device has already watched it (or closed it this visit)
   useEffect(() => {
+    if (placement !== "login") return;
     let live = true;
     void fetchCurrent().then((t) => {
       if (!live || !t) return;
       setTutorial(t);
-      let closedThisVisit = false;
-      try { closedThisVisit = sessionStorage.getItem(`tutorial-closed-${t.id}`) === "1"; } catch { /* private window */ }
-      if (!t.seen && !closedThisVisit) setOpen(true);
+      const watched = readFlag(typeof window !== "undefined" ? window.localStorage : undefined, seenKey(t.id));
+      const closedThisVisit = readFlag(typeof window !== "undefined" ? window.sessionStorage : undefined, `tutorial-closed-${t.id}`);
+      if (!watched && !closedThisVisit) setOpen(true);
     });
     return () => { live = false; };
-  }, [fetchCurrent]);
+  }, [fetchCurrent, placement]);
 
   // Opened again from the menu
   useEffect(() => {
@@ -55,9 +62,13 @@ const TutorialPopup = () => {
   }, [tutorial, fetchCurrent]);
 
   const markSeen = useCallback(() => {
-    void api.post("/tutorial/current/seen").catch(() => { /* try again at the next sign-in */ });
+    if (placement === "app") {
+      void api.post("/tutorial/current/seen").catch(() => { /* not important */ });
+    }
+    // Before sign-in there is no account to remember it on, so it is remembered on this device
+    if (tutorial) { try { window.localStorage.setItem(seenKey(tutorial.id), "1"); } catch { /* private window */ } }
     setTutorial((t) => (t ? { ...t, seen: true } : t));
-  }, []);
+  }, [placement, tutorial]);
 
   const close = useCallback(() => {
     videoRef.current?.pause();
@@ -104,7 +115,7 @@ const TutorialPopup = () => {
         </div>
 
         <div className="flex flex-col-reverse items-stretch gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-slate-500">You can watch this again any time from the menu, under Tutorial.</p>
+          <p className="text-xs text-slate-500">{placement === "login" ? "You can watch this again from the menu, under Tutorial, after you sign in." : "You can watch this again any time from the menu, under Tutorial."}</p>
           <div className="flex gap-2">
             <button onClick={close} className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:flex-none">
               Close
