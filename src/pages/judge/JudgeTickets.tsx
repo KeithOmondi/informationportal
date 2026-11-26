@@ -27,6 +27,18 @@ const longDate = (iso: string | null) =>
 
 const size = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
+/** Turns web addresses in the Help Desk's message into links. */
+const withLinks = (text: string) =>
+  text.split(/((?:https?:\/\/|www\.)[^\s<>"]+[^\s<>".,;:!?)\]])/gi).map((part, i) =>
+    i % 2 ? (
+      <a key={i} href={/^www\./i.test(part) ? "https://" + part : part} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#355E3B] underline">
+        {part}
+      </a>
+    ) : (
+      part
+    ),
+  );
+
 export default function JudgeTickets() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,7 +104,7 @@ export default function JudgeTickets() {
                 {(t.travelDate || t.ticketRef) && (
                   <p className="mt-0.5 text-sm text-slate-600">{[longDate(t.travelDate), t.ticketRef].filter(Boolean).join(" · ")}</p>
                 )}
-                {t.note && <p className="mt-1 text-sm text-slate-600">{t.note}</p>}
+                {t.note && <p className="mt-1 whitespace-pre-line break-words text-sm text-slate-600">{withLinks(t.note)}</p>}
                 <p className="mt-1 flex items-center gap-1 text-xs text-slate-400"><FileText size={12} /> <span className="break-all">{t.fileName}</span> · {size(t.sizeBytes)}</p>
               </div>
               <button
