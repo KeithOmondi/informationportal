@@ -24,6 +24,7 @@ import AdminGallery from "../pages/admin/AdminGallary";
 import JudgeGallery from "../pages/judge/JudgesGallary";
 import JudgeMessagePage from "../pages/judge/JudgeMessage";
 import JudgeUtilities from "../pages/judge/JudgeUtilities";
+import JudgeTickets from "../pages/judge/JudgeTickets";
 import DrLayout from "../components/dr/DrLayout";
 import DrDashboard from "../pages/dr/DrDashboard";
 import DrPasswordSetup from "../components/Login/DrPasswordSetup";
@@ -90,6 +91,7 @@ export default function AppRoutes() {
         <Route path="view-documents" element={<ViewOnlyLibrary />} />
         <Route path="gallery" element={<JudgeGallery />} />
         <Route path="utilities" element={<JudgeUtilities />} />
+        <Route path="tickets" element={<JudgeTickets />} />
 
         {/* Default redirect for /judge */}
         <Route index element={<Navigate to="dashboard" replace />} />

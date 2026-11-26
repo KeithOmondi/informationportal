@@ -11,9 +11,12 @@ import {
   Zap,
   Lock,
   PlayCircle,
+  Plane,
   type LucideIcon 
 } from "lucide-react";
 import { useViewDocs } from "../viewonly/useViewDocs";
+import { useEffect, useState } from "react";
+import { api } from "../../api/axios";
 import { useAppDispatch } from "../../store/hooks";
 import { logoutUser } from "../../store/slices/adminAuthSlice";
 import { OPEN_TUTORIAL_EVENT } from "./TutorialPopup";
@@ -74,6 +77,15 @@ const JudgeSidebar = ({ isOpen, setIsOpen }: JudgeSidebarProps) => {
   const { docs: viewDocs } = useViewDocs();
   const newViewDocs = (viewDocs ?? []).filter((d) => d.isNew).length;
   const navigate = useNavigate();
+  const [newTickets, setNewTickets] = useState(0);
+  const { pathname } = useLocation();
+  useEffect(() => {
+    let live = true;
+    api.get("/my-tickets").then(({ data }) => {
+      if (live) setNewTickets((data.data ?? []).filter((t: { opened: boolean }) => !t.opened).length);
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [pathname]);
 
   /* ===========================
       UPDATED LOGOUT HANDLER
@@ -142,6 +154,7 @@ const JudgeSidebar = ({ isOpen, setIsOpen }: JudgeSidebarProps) => {
 
           <SectionTitle>Judges Support</SectionTitle>
           <nav className="space-y-0.5 pb-4">
+            <NavItem icon={Plane} label="My Air Tickets" to="/judge/tickets" badge={newTickets} onClick={() => setIsOpen(false)} />
             <NavItem icon={Zap} label="My Utilities" to="/judge/utilities" onClick={() => setIsOpen(false)} />
             <button
               type="button"
